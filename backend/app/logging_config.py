@@ -5,7 +5,14 @@ from loguru import logger
 import structlog
 from app.config import get_settings
 
-def setup_logging():
+CONSOLE_FORMAT = (
+    "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+    "<level>{level: <8}</level> | "
+    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+    "<level>{message}</level>"
+)
+
+def setup_logging() -> "loguru.Logger":
     """Configure application logging."""
     settings = get_settings()
     
@@ -20,7 +27,7 @@ def setup_logging():
     logger.add(
         sys.stdout,
         level=settings.log_level,
-        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+        format=CONSOLE_FORMAT,
         colorize=True,
     )
     
@@ -58,6 +65,6 @@ def setup_logging():
     
     return logger
 
-def get_logger(name: str):
+def get_logger(name: str) -> "loguru.Logger":
     """Get a logger instance with the given name."""
     return logger.bind(name=name)

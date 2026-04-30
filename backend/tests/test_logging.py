@@ -1,21 +1,33 @@
 """Tests for logging configuration."""
-import os
+import shutil
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from app.logging_config import setup_logging, get_logger
 
 def test_setup_logging_creates_logs_dir():
-    """Test that setup_logging creates logs directory."""
-    # Remove logs dir if exists
-    if Path("logs").exists():
-        import shutil
-        shutil.rmtree("logs")
+    """Test that setup_logging creates logs directory and configures handlers."""
+    logs_dir = Path("logs")
     
-    with patch('app.logging_config.logger'):
-        setup_logging()
-        assert Path("logs").exists()
+    try:
+        with patch('app.logging_config.logger') as mock_logger, \
+             patch('app.logging_config.structlog') as mock_structlog:
+            setup_logging()
+            
+            mock_logger.remove.assert_called_once()
+            assert mock_logger.add.call_count == 2  # console + file
+            mock_structlog.configure.assert_called_once()
+            assert logs_dir.exists()
+    finally:
+        if logs_dir.exists():
+            shutil.rmtree(logs_dir)
 
-def test_get_logger_returns_logger():
-    """Test that get_logger returns a logger instance."""
-    logger = get_logger("test")
-    assert logger is not None
+def test_get_logger_returns_bound_logger():
+    """Test that get_logger returns a logger bound with the given name."""
+    with patch('app.logging_config.logger') as mock_logger:
+        mock_bound = MagicMock()
+        mock_logger.bind.return_value = mock_bound
+        
+        result = get_logger("test")
+        
+        mock_logger.bind.assert_called_once_with(name="test")
+        assert result is mock_bound
