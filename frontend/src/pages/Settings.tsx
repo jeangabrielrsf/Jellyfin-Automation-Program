@@ -1,8 +1,29 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Input } from '../components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Folder, Sparkles, Save } from 'lucide-react';
 import { settingsAPI } from '../services/api';
+
+const settingGroups = [
+  {
+    icon: Folder,
+    title: 'Caminhos',
+    description: 'Diretórios onde o conteúdo será salvo',
+    settings: [
+      { key: 'movies_path', label: 'Pasta de Filmes', placeholder: '/media/movies' },
+      { key: 'series_path', label: 'Pasta de Séries', placeholder: '/media/series' },
+      { key: 'animes_path', label: 'Pasta de Animes', placeholder: '/media/animes' },
+    ],
+  },
+  {
+    icon: Sparkles,
+    title: 'Preferências',
+    description: 'Configurações padrão para novos downloads',
+    settings: [
+      { key: 'default_quality', label: 'Qualidade Padrão', placeholder: '1080p' },
+      { key: 'default_language', label: 'Idioma Padrão', placeholder: 'legendado' },
+    ],
+  },
+];
 
 const SettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -13,55 +34,96 @@ const SettingsPage: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ key, value }: { key: string; value: any }) =>
+    mutationFn: ({ key, value }: { key: string; value: string }) =>
       settingsAPI.updateSetting(key, value),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
     },
   });
 
-  const handleUpdate = (key: string, value: any) => {
-    updateMutation.mutate({ key, value });
+  const handleUpdate = (key: string, value: string) => {
+    if (value) {
+      updateMutation.mutate({ key, value });
+    }
   };
 
   if (isLoading) {
-    return <div className="text-center py-8">Carregando configurações...</div>;
+    return (
+      <div className="space-y-8 animate-fade-in">
+        <div className="text-center space-y-4">
+          <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">
+            Configurações
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[1, 2].map((i) => (
+            <div key={i} className="glass rounded-2xl p-6 h-64 animate-shimmer" />
+          ))}
+        </div>
+      </div>
+    );
   }
-
-  const settingKeys = [
-    { key: 'movies_path', label: 'Pasta de Filmes', type: 'text' },
-    { key: 'series_path', label: 'Pasta de Séries', type: 'text' },
-    { key: 'animes_path', label: 'Pasta de Animes', type: 'text' },
-    { key: 'default_quality', label: 'Qualidade Padrão', type: 'text' },
-    { key: 'default_language', label: 'Idioma Padrão', type: 'text' },
-  ];
 
   const currentValues = currentSettings?.data || {};
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Configurações</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {settingKeys.map((setting) => (
-          <Card key={setting.key}>
-            <CardHeader>
-              <CardTitle className="text-lg">{setting.label}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <Input
-                  defaultValue={currentValues[setting.key] || ''}
-                  placeholder={`Digite ${setting.label.toLowerCase()}`}
-                  onBlur={(e) => {
-                    if (e.target.value) {
-                      handleUpdate(setting.key, e.target.value);
-                    }
-                  }}
-                />
+    <div className="space-y-8 animate-fade-in">
+      <div className="text-center space-y-4">
+        <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">
+          Configurações
+        </h2>
+        <p className="text-muted-foreground max-w-xl mx-auto">
+          Configure os caminhos de mídia e preferências de download
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {settingGroups.map((group) => (
+          <div
+            key={group.title}
+            className="glass rounded-2xl p-6 space-y-6
+                     transition-all duration-300 hover:border-primary/20"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <group.icon className="w-5 h-5 text-primary" />
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <h3 className="font-display text-lg font-bold text-foreground">
+                  {group.title}
+                </h3>
+                <p className="text-sm text-muted-foreground">{group.description}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {group.settings.map((setting) => (
+                <div key={setting.key} className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    {setting.label}
+                  </label>
+                  <div className="relative group">
+                    <input
+                      type="text"
+                      defaultValue={currentValues[setting.key] || ''}
+                      placeholder={setting.placeholder}
+                      onBlur={(e) => handleUpdate(setting.key, e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl glass bg-transparent
+                               border border-border/50
+                               focus:outline-none focus:ring-2 focus:ring-primary/30
+                               focus:border-primary/30
+                               text-foreground placeholder:text-muted-foreground/50
+                               font-mono text-sm
+                               transition-all duration-200"
+                    />
+                    {updateMutation.isPending && updateMutation.variables?.key === setting.key && (
+                      <Save className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-pulse" />
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </div>
