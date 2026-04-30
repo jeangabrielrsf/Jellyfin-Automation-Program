@@ -8,14 +8,14 @@ class TorrentResult(BaseModel):
     indexer: str
     size: str
     seeds: int
-    peers: int
-    download_url: str
+    peers: Optional[int] = None
+    download_url: Optional[str] = None
     magnet_url: Optional[str] = None
     quality: Optional[str] = None
     language: Optional[str] = None
     release_group: Optional[str] = None
     score: float = 0.0
-    
+
     class Config:
         from_attributes = True
 
