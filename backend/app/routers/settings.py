@@ -1,5 +1,5 @@
 """Settings router."""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Any
 from app.database import get_db
@@ -24,7 +24,7 @@ def get_setting(key: str, db: Session = Depends(get_db)):
 @router.put("/{key}")
 def update_setting(
     key: str,
-    value: Any,
+    value: Any = Body(...),
     db: Session = Depends(get_db)
 ):
     """Update or create a setting."""
