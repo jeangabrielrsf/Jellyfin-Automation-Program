@@ -1,6 +1,8 @@
 """Tests for qBittorrent service."""
-import pytest
 from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
+
 from app.services.qbittorrent_service import QBittorrentService
 
 @pytest.fixture
