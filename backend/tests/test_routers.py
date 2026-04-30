@@ -122,6 +122,35 @@ class TestSearchRouter:
                 assert len(data) == 1
                 assert data[0]["title"] == "Test"
 
+    def test_get_tv_seasons(self, client):
+        """Test TV seasons endpoint."""
+        from app.models.tmdb import TMDBDetail
+        mock_detail = TMDBDetail(
+            id=2,
+            name="Test Show",
+            overview="A test",
+            first_air_date="2022-06-15",
+            vote_average=7.5,
+            genres=[],
+            number_of_seasons=2,
+            number_of_episodes=20,
+            seasons=[
+                {"season_number": 0, "name": "Specials", "episode_count": 2},
+                {"season_number": 1, "name": "Season 1", "episode_count": 10},
+                {"season_number": 2, "name": "Season 2", "episode_count": 10},
+            ]
+        )
+
+        with patch('app.routers.search.TMDBService.get_tv_detail') as mock_get:
+            mock_get.return_value = mock_detail
+            response = client.get("/api/search/tv/2/seasons")
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data) == 2
+            assert data[0]["season_number"] == 1
+            assert data[0]["episode_count"] == 10
+            assert data[1]["season_number"] == 2
+
 
 class TestDownloadsRouter:
     """Tests for downloads endpoints."""
