@@ -1,25 +1,43 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DownloadMonitor } from '../components/DownloadMonitor';
 import { downloadAPI } from '../services/api';
 
 const DownloadsPage: React.FC = () => {
+  const queryClient = useQueryClient();
   const { data: downloads, isLoading } = useQuery({
     queryKey: ['downloads'],
     queryFn: () => downloadAPI.listDownloads(),
     refetchInterval: 5000,
   });
 
+  const pauseMutation = useMutation({
+    mutationFn: (id: number) => downloadAPI.pauseDownload(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['downloads'] }),
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: (id: number) => downloadAPI.resumeDownload(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['downloads'] }),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: number) => downloadAPI.cancelDownload(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['downloads'] }),
+  });
+
   const handlePause = (id: number) => {
-    console.log('Pause:', id);
+    pauseMutation.mutate(id);
   };
 
   const handleResume = (id: number) => {
-    console.log('Resume:', id);
+    resumeMutation.mutate(id);
   };
 
   const handleCancel = (id: number) => {
-    console.log('Cancel:', id);
+    if (window.confirm('Tem certeza que deseja cancelar este download?')) {
+      cancelMutation.mutate(id);
+    }
   };
 
   if (isLoading) {

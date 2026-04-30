@@ -91,7 +91,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             data = await websocket.receive_text()
             try:
                 message = json.loads(data)
-                if message.get("type") == "ping":
+                if isinstance(message, dict) and message.get("type") == "ping":
                     await websocket.send_json({"type": "pong"})
             except json.JSONDecodeError:
                 logger.debug("Received malformed JSON via WebSocket")

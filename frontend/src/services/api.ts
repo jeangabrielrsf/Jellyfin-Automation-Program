@@ -44,6 +44,12 @@ export const downloadAPI = {
   
   cancelDownload: (id: number) =>
     api.delete(`/downloads/${id}`),
+
+  pauseDownload: (id: number) =>
+    api.post(`/downloads/${id}/pause`),
+
+  resumeDownload: (id: number) =>
+    api.post(`/downloads/${id}/resume`),
 };
 
 export const settingsAPI = {

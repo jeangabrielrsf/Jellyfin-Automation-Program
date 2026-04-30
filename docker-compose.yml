@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: jellyfin_automation
+      POSTGRES_USER: jfa_user
+      POSTGRES_PASSWORD: jfa_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jfa_user -d jellyfin_automation"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://jfa_user:jfa_password@db:5432/jellyfin_automation
+      TMDB_API_KEY: ${TMDB_API_KEY:-}
+      JACKETT_URL: ${JACKETT_URL:-http://jackett:9117}
+      JACKETT_API_KEY: ${JACKETT_API_KEY:-}
+      QBITTORRENT_HOST: ${QBITTORRENT_HOST:-http://qbittorrent:8080}
+      QBITTORRENT_USERNAME: ${QBITTORRENT_USERNAME:-admin}
+      QBITTORRENT_PASSWORD: ${QBITTORRENT_PASSWORD:-adminadmin}
+      JELLYFIN_URL: ${JELLYFIN_URL:-http://jellyfin:8096}
+      JELLYFIN_API_KEY: ${JELLYFIN_API_KEY:-}
+      MOVIES_PATH: /movies
+      SERIES_PATH: /series
+      ANIMES_PATH: /animes
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ${MOVIES_PATH:-./media/movies}:/movies
+      - ${SERIES_PATH:-./media/series}:/series
+      - ${ANIMES_PATH:-./media/animes}:/animes
+      - ./backend/logs:/app/logs
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

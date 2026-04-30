@@ -6,21 +6,17 @@ from unittest.mock import patch
 from app.services.organizer_service import OrganizerService
 
 @pytest.fixture
-def organizer_service():
-    return OrganizerService()
-
-@pytest.fixture
 def temp_media_dirs():
     """Create temporary directories for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         movies_dir = Path(tmpdir) / "movies"
         series_dir = Path(tmpdir) / "series"
         animes_dir = Path(tmpdir) / "animes"
-        
+
         movies_dir.mkdir()
         series_dir.mkdir()
         animes_dir.mkdir()
-        
+
         with patch('app.services.organizer_service.get_settings') as mock_settings:
             mock_settings.return_value.movies_path = str(movies_dir)
             mock_settings.return_value.series_path = str(series_dir)
@@ -30,6 +26,10 @@ def temp_media_dirs():
                 "series": series_dir,
                 "animes": animes_dir
             }
+
+@pytest.fixture
+def organizer_service(temp_media_dirs):
+    return OrganizerService()
 
 def test_sanitize_filename(organizer_service):
     """Test filename sanitization."""

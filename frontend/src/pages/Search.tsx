@@ -3,7 +3,7 @@ import { useQuery, skipToken } from '@tanstack/react-query';
 import { SearchBar } from '../components/SearchBar';
 import { MediaCard } from '../components/MediaCard';
 import { TorrentList } from '../components/TorrentList';
-import { searchAPI } from '../services/api';
+import { searchAPI, downloadAPI } from '../services/api';
 import { TMDBSearchResult, TorrentResult } from '../types';
 
 const SearchPage: React.FC = () => {
@@ -37,9 +37,24 @@ const SearchPage: React.FC = () => {
     setSelectedMedia(media);
   };
 
-  const handleDownload = (torrent: TorrentResult) => {
-    // TODO: Implement download creation
-    console.log('Download:', torrent);
+  const handleDownload = async (torrent: TorrentResult) => {
+    if (!selectedMedia) return;
+    try {
+      await downloadAPI.createDownload({
+        tmdb_id: selectedMedia.id,
+        title: selectedMedia.title || selectedMedia.name || '',
+        type: selectedMedia.media_type,
+        torrent_name: torrent.title,
+        magnet_link: torrent.magnet_url || torrent.download_url || '',
+        quality: torrent.quality || '1080p',
+        language_preference: torrent.language || 'legendado',
+        indexer_used: torrent.indexer,
+      });
+      alert('Download iniciado com sucesso!');
+    } catch (error) {
+      console.error('Failed to start download:', error);
+      alert('Erro ao iniciar download.');
+    }
   };
 
   return (

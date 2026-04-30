@@ -77,3 +77,43 @@ def cancel_download(download_id: int, db: Session = Depends(get_db)):
     except Exception:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error")
+
+@router.post("/{download_id}/pause")
+async def pause_download(download_id: int, db: Session = Depends(get_db)):
+    """Pause a download in qBittorrent."""
+    download = db.query(Download).filter(Download.id == download_id).first()
+    if not download:
+        raise HTTPException(status_code=404, detail="Download not found")
+    
+    if not download.torrent_hash:
+        raise HTTPException(status_code=400, detail="No torrent hash associated with this download")
+    
+    from app.services.qbittorrent_service import QBittorrentService
+    service = QBittorrentService()
+    success = await service.pause_torrent(download.torrent_hash)
+    await service.close()
+    
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to pause torrent in qBittorrent")
+    
+    return {"message": "Download paused"}
+
+@router.post("/{download_id}/resume")
+async def resume_download(download_id: int, db: Session = Depends(get_db)):
+    """Resume a download in qBittorrent."""
+    download = db.query(Download).filter(Download.id == download_id).first()
+    if not download:
+        raise HTTPException(status_code=404, detail="Download not found")
+    
+    if not download.torrent_hash:
+        raise HTTPException(status_code=400, detail="No torrent hash associated with this download")
+    
+    from app.services.qbittorrent_service import QBittorrentService
+    service = QBittorrentService()
+    success = await service.resume_torrent(download.torrent_hash)
+    await service.close()
+    
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to resume torrent in qBittorrent")
+    
+    return {"message": "Download resumed"}
