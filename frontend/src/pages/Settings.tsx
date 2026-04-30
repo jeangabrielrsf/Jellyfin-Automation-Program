@@ -103,19 +103,53 @@ const SettingsPage: React.FC = () => {
                     {setting.label}
                   </label>
                   <div className="relative group">
-                    <input
-                      type="text"
-                      defaultValue={currentValues[setting.key] || ''}
-                      placeholder={setting.placeholder}
-                      onBlur={(e) => handleUpdate(setting.key, e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl glass bg-transparent
-                               border border-border/50
-                               focus:outline-none focus:ring-2 focus:ring-primary/30
-                               focus:border-primary/30
-                               text-foreground placeholder:text-muted-foreground/50
-                               font-mono text-sm
-                               transition-all duration-200"
-                    />
+                    {setting.key === 'default_quality' ? (
+                      <select
+                        defaultValue={currentValues[setting.key] || '1080p'}
+                        onChange={(e) => handleUpdate(setting.key, e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl glass bg-transparent
+                                 border border-border/50
+                                 focus:outline-none focus:ring-2 focus:ring-primary/30
+                                 focus:border-primary/30
+                                 text-foreground
+                                 font-mono text-sm
+                                 transition-all duration-200"
+                      >
+                        <option value="720p">720p</option>
+                        <option value="1080p">1080p</option>
+                        <option value="1440p">1440p</option>
+                        <option value="2160p">2160p</option>
+                      </select>
+                    ) : setting.key === 'default_language' ? (
+                      <select
+                        defaultValue={currentValues[setting.key] || 'legendado'}
+                        onChange={(e) => handleUpdate(setting.key, e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl glass bg-transparent
+                                 border border-border/50
+                                 focus:outline-none focus:ring-2 focus:ring-primary/30
+                                 focus:border-primary/30
+                                 text-foreground
+                                 font-mono text-sm
+                                 transition-all duration-200"
+                      >
+                        <option value="legendado">Legendado</option>
+                        <option value="dublado">Dublado</option>
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        defaultValue={currentValues[setting.key] || ''}
+                        placeholder={setting.placeholder}
+                        onBlur={(e) => handleUpdate(setting.key, e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl glass bg-transparent
+                                 border border-border/50
+                                 focus:outline-none focus:ring-2 focus:ring-primary/30
+                                 focus:border-primary/30
+                                 text-foreground placeholder:text-muted-foreground/50
+                                 font-mono text-sm
+                                 transition-all duration-200"
+                      />
+                    )}
                     {updateMutation.isPending && updateMutation.variables?.key === setting.key && (
                       <Save className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-pulse" />
                     )}
