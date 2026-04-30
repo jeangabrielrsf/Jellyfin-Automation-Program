@@ -103,7 +103,7 @@ class OrganizerService:
         video_files.sort(key=lambda x: x.stat().st_size, reverse=True)
         return video_files
     
-    def _move_file(self, source: Path, destination: Path):
+    def _move_file(self, source: Path, destination: Path) -> None:
         """Move file from source to destination."""
         if destination.exists():
             source_size = source.stat().st_size
@@ -119,7 +119,7 @@ class OrganizerService:
         shutil.move(str(source), str(destination))
         logger.debug("File moved", source=str(source), destination=str(destination))
     
-    def _move_subtitles(self, source: Path, dest_folder: Path, base_name: str):
+    def _move_subtitles(self, source: Path, dest_folder: Path, base_name: str) -> None:
         """Move subtitle files to destination."""
         if source.is_file():
             source_dir = source.parent
@@ -130,10 +130,13 @@ class OrganizerService:
             for sub_file in source_dir.glob(f"*{ext}"):
                 dest_name = f"{base_name}{ext}"
                 dest_path = dest_folder / self._sanitize_filename(dest_name)
+                if dest_path.exists():
+                    logger.warning("Subtitle already exists, skipping", destination=str(dest_path))
+                    continue
                 shutil.move(str(sub_file), str(dest_path))
                 logger.debug("Subtitle moved", source=str(sub_file), destination=str(dest_path))
     
-    def _cleanup_source(self, source: Path):
+    def _cleanup_source(self, source: Path) -> None:
         """Remove empty source directories."""
         if source.is_file():
             source = source.parent
@@ -143,15 +146,15 @@ class OrganizerService:
                 try:
                     file.unlink()
                     logger.debug("Removed unnecessary file", file=str(file))
-                except:
-                    pass
+                except (OSError, PermissionError) as e:
+                    logger.warning("Failed to remove file", file=str(file), error=str(e))
         
         try:
             if source.exists() and not any(source.iterdir()):
                 source.rmdir()
                 logger.debug("Removed empty source directory", directory=str(source))
-        except:
-            pass
+        except (OSError, PermissionError) as e:
+            logger.warning("Failed to remove directory", directory=str(source), error=str(e))
     
     def _sanitize_filename(self, filename: str) -> str:
         """Remove invalid characters from filename."""
