@@ -26,14 +26,8 @@ const DownloadsPage: React.FC = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['downloads'] }),
   });
 
-  const handlePause = (id: number) => {
-    pauseMutation.mutate(id);
-  };
-
-  const handleResume = (id: number) => {
-    resumeMutation.mutate(id);
-  };
-
+  const handlePause = (id: number) => pauseMutation.mutate(id);
+  const handleResume = (id: number) => resumeMutation.mutate(id);
   const handleCancel = (id: number) => {
     if (window.confirm('Tem certeza que deseja cancelar este download?')) {
       cancelMutation.mutate(id);
@@ -41,12 +35,34 @@ const DownloadsPage: React.FC = () => {
   };
 
   if (isLoading) {
-    return <div className="text-center py-8">Carregando downloads...</div>;
+    return (
+      <div className="space-y-8 animate-fade-in">
+        <div className="text-center space-y-4">
+          <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">
+            Downloads
+          </h2>
+          <p className="text-muted-foreground">Gerencie seus downloads ativos</p>
+        </div>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="glass rounded-2xl p-5 h-32 animate-shimmer" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Downloads</h2>
+    <div className="space-y-8 animate-fade-in">
+      <div className="text-center space-y-4">
+        <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">
+          Downloads
+        </h2>
+        <p className="text-muted-foreground max-w-xl mx-auto">
+          Monitore e gerencie todos os seus downloads em tempo real
+        </p>
+      </div>
+
       <DownloadMonitor
         downloads={downloads?.data || []}
         onPause={handlePause}
