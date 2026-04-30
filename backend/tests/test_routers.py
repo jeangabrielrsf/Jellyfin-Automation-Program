@@ -84,28 +84,43 @@ class TestSearchRouter:
             assert data["name"] == "Test Show"
 
     def test_search_torrents(self, client):
-        """Test torrent search endpoint."""
+        """Test torrent search endpoint with TMDB lookup."""
+        from app.models.tmdb import TMDBDetail
+        from app.models.torrent import TorrentResult
+        mock_detail = TMDBDetail(
+            id=1,
+            title="Filme Teste",
+            original_title="Test Movie",
+            overview="A test",
+            release_date="2023-01-01",
+            vote_average=8.0,
+            genres=[],
+            runtime=120
+        )
         mock_torrents = [
-            {
-                "title": "Test",
-                "indexer": "1337x",
-                "size": "1 GB",
-                "seeds": 100,
-                "peers": 50,
-                "download_url": "http://example.com",
-                "score": 100.0
-            }
+            TorrentResult(
+                title="Test",
+                indexer="1337x",
+                size="1 GB",
+                seeds=100,
+                peers=50,
+                download_url="http://example.com",
+                magnet_url="magnet:?xt=urn:btih:test",
+                score=100.0
+            )
         ]
 
-        with patch('app.routers.search.JackettScraper.search') as mock_search:
-            mock_search.return_value = mock_torrents
-            response = client.get(
-                "/api/search/torrents?tmdb_id=1&title=test&media_type=movie"
-            )
-            assert response.status_code == 200
-            data = response.json()
-            assert len(data) == 1
-            assert data[0]["title"] == "Test"
+        with patch('app.routers.search.TMDBService.get_movie_detail') as mock_detail_fn:
+            mock_detail_fn.return_value = mock_detail
+            with patch('app.routers.search.JackettScraper.search') as mock_search:
+                mock_search.return_value = mock_torrents
+                response = client.get(
+                    "/api/search/torrents?tmdb_id=1&media_type=movie"
+                )
+                assert response.status_code == 200
+                data = response.json()
+                assert len(data) == 1
+                assert data[0]["title"] == "Test"
 
 
 class TestDownloadsRouter:

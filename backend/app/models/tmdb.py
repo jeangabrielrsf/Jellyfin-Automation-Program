@@ -38,7 +38,9 @@ class TMDBSearchResponse(BaseModel):
 class TMDBDetail(BaseModel):
     id: int
     title: Optional[str] = None
+    original_title: Optional[str] = None
     name: Optional[str] = None
+    original_name: Optional[str] = None
     overview: str
     poster_path: Optional[str] = None
     backdrop_path: Optional[str] = None
@@ -51,6 +53,7 @@ class TMDBDetail(BaseModel):
     number_of_episodes: Optional[int] = None
     status: Optional[str] = None
     tagline: Optional[str] = None
+    seasons: List[dict] = []
     
     @property
     def display_title(self) -> str:
