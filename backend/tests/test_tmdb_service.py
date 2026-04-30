@@ -160,18 +160,22 @@ async def test_search_http_error_raises(tmdb_service):
 @pytest.mark.asyncio
 async def test_get_movie_detail_http_error_raises(tmdb_service):
     mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = Exception("HTTP Error")
-    
+    mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "Error", request=MagicMock(), response=MagicMock()
+    )
+
     with patch.object(tmdb_service.client, 'get', AsyncMock(return_value=mock_response)):
-        with pytest.raises(Exception):
+        with pytest.raises(httpx.HTTPStatusError):
             await tmdb_service.get_movie_detail(123)
 
 
 @pytest.mark.asyncio
 async def test_get_tv_detail_http_error_raises(tmdb_service):
     mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = Exception("HTTP Error")
-    
+    mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "Error", request=MagicMock(), response=MagicMock()
+    )
+
     with patch.object(tmdb_service.client, 'get', AsyncMock(return_value=mock_response)):
-        with pytest.raises(Exception):
+        with pytest.raises(httpx.HTTPStatusError):
             await tmdb_service.get_tv_detail(456)

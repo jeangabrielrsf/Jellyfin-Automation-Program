@@ -39,16 +39,19 @@ class TMDBService:
         data = response.json()
         
         results = [
-            TMDBSearchResult(**item) 
+            TMDBSearchResult(**item)
             for item in data.get("results", [])
             if item.get("media_type") in ["movie", "tv"]
         ]
-        
+
+        filtered_total = len(results)
+        total_pages = max(1, (filtered_total + 19) // 20) if filtered_total > 0 else 0
+
         return TMDBSearchResponse(
             page=data.get("page", 1),
             results=results,
-            total_pages=data.get("total_pages", 0),
-            total_results=len(results)
+            total_pages=total_pages,
+            total_results=filtered_total
         )
     
     async def get_movie_detail(self, movie_id: int) -> TMDBDetail:
