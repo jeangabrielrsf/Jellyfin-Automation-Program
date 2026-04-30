@@ -1,16 +1,11 @@
 """Settings router."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import Dict, Any
+from typing import Any
 from app.database import get_db
 from app.models.settings import Setting
-from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
-
-class SettingsUpdate(BaseModel):
-    key: str
-    value: Any
 
 @router.get("/")
 def get_settings(db: Session = Depends(get_db)):
@@ -22,14 +17,14 @@ def get_settings(db: Session = Depends(get_db)):
 def get_setting(key: str, db: Session = Depends(get_db)):
     """Get specific setting."""
     setting = db.query(Setting).filter(Setting.key == key).first()
-    if setting:
-        return {"key": setting.key, "value": setting.value}
-    return {"key": key, "value": None}
+    if not setting:
+        raise HTTPException(status_code=404, detail="Setting not found")
+    return {"key": setting.key, "value": setting.value}
 
 @router.put("/{key}")
 def update_setting(
     key: str,
-    value: Dict[str, Any],
+    value: Any,
     db: Session = Depends(get_db)
 ):
     """Update or create a setting."""
@@ -39,7 +34,11 @@ def update_setting(
     else:
         setting = Setting(key=key, value=value)
         db.add(setting)
-    
-    db.commit()
-    db.refresh(setting)
+
+    try:
+        db.commit()
+        db.refresh(setting)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update setting: {str(e)}")
     return {"key": setting.key, "value": setting.value}

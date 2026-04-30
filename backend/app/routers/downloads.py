@@ -1,10 +1,9 @@
 """Downloads router."""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import Optional
 from app.database import get_db
 from app.models.download import Download, DownloadStatus, ContentType
-from app.services.qbittorrent_service import QBittorrentService
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/downloads", tags=["downloads"])
@@ -12,7 +11,7 @@ router = APIRouter(prefix="/api/downloads", tags=["downloads"])
 class DownloadCreate(BaseModel):
     tmdb_id: int
     title: str
-    media_type: str
+    media_type: ContentType
     torrent_name: str
     magnet_link: str
     quality: str = "1080p"
@@ -21,7 +20,7 @@ class DownloadCreate(BaseModel):
 
 @router.get("/")
 def list_downloads(
-    status: Optional[str] = None,
+    status: Optional[DownloadStatus] = None,
     db: Session = Depends(get_db)
 ):
     """List all downloads with optional status filter."""
@@ -35,11 +34,11 @@ def create_download(
     download: DownloadCreate,
     db: Session = Depends(get_db)
 ):
-    """Create a new download and add to qBittorrent."""
+    """Create a new download record."""
     db_download = Download(
         tmdb_id=download.tmdb_id,
         title=download.title,
-        type=ContentType(download.media_type),
+        type=download.media_type,
         torrent_name=download.torrent_name,
         magnet_link=download.magnet_link,
         quality=download.quality,

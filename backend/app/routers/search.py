@@ -1,8 +1,6 @@
 """Search router."""
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
-from app.database import get_db
 from app.services.tmdb_service import TMDBService
 from app.scrapers.jackett_scraper import JackettScraper
 from app.models.tmdb import TMDBSearchResponse, TMDBDetail
@@ -13,8 +11,7 @@ router = APIRouter(prefix="/api/search", tags=["search"])
 @router.get("/", response_model=TMDBSearchResponse)
 async def search_media(
     q: str = Query(..., description="Search query"),
-    page: int = Query(1, ge=1),
-    db: Session = Depends(get_db)
+    page: int = Query(1, ge=1)
 ):
     """Search for movies and TV shows on TMDB."""
     service = TMDBService()
@@ -62,7 +59,7 @@ async def get_tv_detail(tv_id: int):
 async def search_torrents(
     tmdb_id: int = Query(...),
     title: str = Query(...),
-    media_type: str = Query(..., regex="^(movie|series|anime)$"),
+    media_type: str = Query(..., pattern="^(movie|series|anime)$"),
     quality: Optional[str] = Query("1080p"),
     language: Optional[str] = Query("legendado")
 ):
@@ -73,3 +70,5 @@ async def search_torrents(
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Torrent search failed: {str(e)}")
+    finally:
+        await scraper.close()
