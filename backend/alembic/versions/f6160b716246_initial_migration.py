@@ -48,7 +48,7 @@ def upgrade() -> None:
     op.create_table('settings',
     sa.Column('key', sa.String(length=100), nullable=False),
     sa.Column('value', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
     sa.PrimaryKeyConstraint('key')
     )
     # ### end Alembic commands ###
