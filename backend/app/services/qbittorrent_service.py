@@ -1,6 +1,6 @@
 """qBittorrent Web API service."""
-import httpx
 from typing import List, Optional, Dict
+import httpx
 from app.config import get_settings
 from app.logging_config import get_logger
 
@@ -34,7 +34,7 @@ class QBittorrentService:
             else:
                 logger.error("qBittorrent authentication failed", response=response.text)
                 return False
-        except Exception as e:
+        except (httpx.HTTPError, httpx.RequestError) as e:
             logger.error("qBittorrent authentication error", error=str(e))
             return False
     
@@ -59,7 +59,7 @@ class QBittorrentService:
             logger.info("Torrent added to qBittorrent", magnet=magnet_link[:50])
             return True
             
-        except Exception as e:
+        except httpx.HTTPError as e:
             logger.error("Failed to add torrent", error=str(e))
             return False
     
@@ -75,7 +75,7 @@ class QBittorrentService:
             response.raise_for_status()
             return response.json()
             
-        except Exception as e:
+        except httpx.HTTPError as e:
             logger.error("Failed to get torrents", error=str(e))
             return []
     
@@ -100,7 +100,7 @@ class QBittorrentService:
             response.raise_for_status()
             return True
             
-        except Exception as e:
+        except httpx.HTTPError as e:
             logger.error("Failed to pause torrent", error=str(e))
             return False
     
@@ -117,7 +117,7 @@ class QBittorrentService:
             response.raise_for_status()
             return True
             
-        except Exception as e:
+        except httpx.HTTPError as e:
             logger.error("Failed to resume torrent", error=str(e))
             return False
     
@@ -137,7 +137,7 @@ class QBittorrentService:
             response.raise_for_status()
             return True
             
-        except Exception as e:
+        except httpx.HTTPError as e:
             logger.error("Failed to delete torrent", error=str(e))
             return False
     

@@ -1,11 +1,15 @@
 """Tests for qBittorrent service."""
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch, MagicMock
 from app.services.qbittorrent_service import QBittorrentService
 
 @pytest.fixture
 def qb_service():
-    return QBittorrentService()
+    with patch("app.services.qbittorrent_service.get_settings") as mock_settings:
+        mock_settings.return_value.qbittorrent_host = "http://localhost:8080"
+        mock_settings.return_value.qbittorrent_username = "admin"
+        mock_settings.return_value.qbittorrent_password = "adminadmin"
+        yield QBittorrentService()
 
 @pytest.mark.asyncio
 async def test_authenticate_success(qb_service):
@@ -17,8 +21,8 @@ async def test_authenticate_success(qb_service):
         mock_post.return_value.raise_for_status = Mock()
         
         result = await qb_service._authenticate()
-        assert result == True
-        assert qb_service._authenticated == True
+        assert result is True
+        assert qb_service._authenticated is True
 
 @pytest.mark.asyncio
 async def test_add_torrent(qb_service):
@@ -30,7 +34,7 @@ async def test_add_torrent(qb_service):
         mock_post.return_value.raise_for_status = Mock()
         
         result = await qb_service.add_torrent("magnet:?xt=urn:btih:test")
-        assert result == True
+        assert result is True
 
 @pytest.mark.asyncio
 async def test_get_torrents(qb_service):
