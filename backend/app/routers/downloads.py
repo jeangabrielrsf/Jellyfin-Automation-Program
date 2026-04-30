@@ -46,11 +46,14 @@ def create_download(
         status=DownloadStatus.PENDING,
         indexer_used=download.indexer_used
     )
-    db.add(db_download)
-    db.commit()
-    db.refresh(db_download)
-    
-    return db_download
+    try:
+        db.add(db_download)
+        db.commit()
+        db.refresh(db_download)
+        return db_download
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error")
 
 @router.get("/{download_id}")
 def get_download(download_id: int, db: Session = Depends(get_db)):
@@ -67,7 +70,10 @@ def cancel_download(download_id: int, db: Session = Depends(get_db)):
     if not download:
         raise HTTPException(status_code=404, detail="Download not found")
     
-    download.status = DownloadStatus.CANCELLED
-    db.commit()
-    
-    return {"message": "Download cancelled"}
+    try:
+        download.status = DownloadStatus.CANCELLED
+        db.commit()
+        return {"message": "Download cancelled"}
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error")

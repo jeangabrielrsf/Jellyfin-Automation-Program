@@ -19,7 +19,7 @@ def get_logs(
 
     try:
         with open(log_file, 'r', encoding='utf-8') as f:
-            all_lines = f.readlines()
+            all_lines = [line.rstrip('\n') for line in f.readlines()]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to read logs: {str(e)}")
 
