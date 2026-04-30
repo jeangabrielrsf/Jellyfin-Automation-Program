@@ -1,8 +1,9 @@
 """Jackett scraper implementation."""
 import json
 import re
-import httpx
 from typing import List
+
+import httpx
 from app.scrapers.base import BaseScraper
 from app.models.torrent import TorrentResult
 from app.config import get_settings
@@ -66,9 +67,13 @@ class JackettScraper(BaseScraper):
             logger.error("Jackett search failed", error=str(e))
             return []
     
-    async def get_magnet(self, magnet_url: str) -> str:
+    async def get_magnet(self, torrent_id: str) -> str:
         """Return the magnet URL (Jackett already provides the magnet link in search results)."""
-        return magnet_url
+        return torrent_id
+    
+    async def close(self):
+        """Close the HTTP client."""
+        await self.client.aclose()
     
     def _get_category(self, media_type: str) -> List[int]:
         """Get Jackett category IDs based on content type."""
@@ -98,7 +103,7 @@ class JackettScraper(BaseScraper):
     def _extract_language(self, title: str) -> str:
         """Extract language from title."""
         title_lower = title.lower()
-        if 'dual' in title_lower:
+        if re.search(r'\bdual\b', title_lower):
             return "Dual Áudio"
         elif 'dublado' in title_lower or 'dub' in title_lower:
             return "Dublado"

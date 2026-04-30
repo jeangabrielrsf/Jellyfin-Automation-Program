@@ -1,6 +1,7 @@
 """Base scraper interface."""
 from abc import ABC, abstractmethod
 from typing import List
+
 from app.models.torrent import TorrentResult
 
 class BaseScraper(ABC):
