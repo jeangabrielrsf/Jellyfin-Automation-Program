@@ -1,6 +1,11 @@
 import axios from 'axios';
 // Types used implicitly by API consumers
 
+const mapMediaType = (mediaType: string): string => {
+  if (mediaType === 'tv') return 'series';
+  return mediaType;
+};
+
 const api = axios.create({
   baseURL: '/api',
   headers: {
@@ -21,10 +26,15 @@ export const searchAPI = {
   searchTorrents: (params: {
     tmdb_id: number;
     title: string;
-    type: string;
+    media_type: string;
     quality?: string;
     language?: string;
-  }) => api.get('/search/torrents', { params }),
+  }) => api.get('/search/torrents', {
+    params: {
+      ...params,
+      media_type: mapMediaType(params.media_type),
+    }
+  }),
 };
 
 export const downloadAPI = {
@@ -34,13 +44,16 @@ export const downloadAPI = {
   createDownload: (data: {
     tmdb_id: number;
     title: string;
-    type: string;
+    media_type: string;
     torrent_name: string;
     magnet_link: string;
     quality?: string;
     language_preference?: string;
     indexer_used?: string;
-  }) => api.post('/downloads', data),
+  }) => api.post('/downloads', {
+    ...data,
+    media_type: mapMediaType(data.media_type),
+  }),
   
   cancelDownload: (id: number) =>
     api.delete(`/downloads/${id}`),

@@ -18,12 +18,12 @@ const SearchPage: React.FC = () => {
 
   const { data: torrentResults } = useQuery({
     queryKey: ['torrents', selectedMedia?.id],
-    queryFn: selectedMedia
+    queryFn: selectedMedia && ['movie', 'tv'].includes(selectedMedia.media_type)
       ? () =>
           searchAPI.searchTorrents({
             tmdb_id: selectedMedia.id,
             title: selectedMedia.title || selectedMedia.name || '',
-            type: selectedMedia.media_type,
+            media_type: selectedMedia.media_type,
           })
       : skipToken,
   });
@@ -43,7 +43,7 @@ const SearchPage: React.FC = () => {
       await downloadAPI.createDownload({
         tmdb_id: selectedMedia.id,
         title: selectedMedia.title || selectedMedia.name || '',
-        type: selectedMedia.media_type,
+        media_type: selectedMedia.media_type,
         torrent_name: torrent.title,
         magnet_link: torrent.magnet_url || torrent.download_url || '',
         quality: torrent.quality || '1080p',
