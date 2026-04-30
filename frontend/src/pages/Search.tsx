@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
-import { useQuery, skipToken } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { SearchBar } from '../components/SearchBar';
 import { MediaCard } from '../components/MediaCard';
-import { TorrentList } from '../components/TorrentList';
-import { searchAPI, downloadAPI } from '../services/api';
-import { TMDBSearchResult, TorrentResult } from '../types';
+import { searchAPI } from '../services/api';
+import { TMDBSearchResult } from '../types';
+
+const STORAGE_KEY = 'search_state';
 
 const SearchPage: React.FC = () => {
-  const [selectedMedia, setSelectedMedia] = useState<TMDBSearchResult | null>(null);
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
 
   const { data: searchResults, isLoading: isSearching } = useQuery({
@@ -16,45 +18,39 @@ const SearchPage: React.FC = () => {
     enabled: !!searchQuery,
   });
 
-  const { data: torrentResults } = useQuery({
-    queryKey: ['torrents', selectedMedia?.id],
-    queryFn: selectedMedia && ['movie', 'tv'].includes(selectedMedia.media_type)
-      ? () =>
-          searchAPI.searchTorrents({
-            tmdb_id: selectedMedia.id,
-            title: selectedMedia.title || selectedMedia.name || '',
-            media_type: selectedMedia.media_type,
-          })
-      : skipToken,
-  });
+  useEffect(() => {
+    const saved = sessionStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const { query, scrollY } = JSON.parse(saved);
+        if (query) {
+          setSearchQuery(query);
+        }
+        if (scrollY !== undefined) {
+          requestAnimationFrame(() => {
+            window.scrollTo(0, scrollY);
+          });
+        }
+        sessionStorage.removeItem(STORAGE_KEY);
+      } catch {
+        sessionStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  }, []);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    setSelectedMedia(null);
   };
 
   const handleMediaClick = (media: TMDBSearchResult) => {
-    setSelectedMedia(media);
-  };
-
-  const handleDownload = async (torrent: TorrentResult) => {
-    if (!selectedMedia) return;
-    try {
-      await downloadAPI.createDownload({
-        tmdb_id: selectedMedia.id,
-        title: selectedMedia.title || selectedMedia.name || '',
-        media_type: selectedMedia.media_type,
-        torrent_name: torrent.title,
-        magnet_link: torrent.magnet_url || torrent.download_url || '',
-        quality: torrent.quality || '1080p',
-        language_preference: torrent.language || 'legendado',
-        indexer_used: torrent.indexer,
-      });
-      alert('Download iniciado com sucesso!');
-    } catch (error) {
-      console.error('Failed to start download:', error);
-      alert('Erro ao iniciar download.');
-    }
+    sessionStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        query: searchQuery,
+        scrollY: window.scrollY,
+      })
+    );
+    navigate(`/detail/${media.media_type}/${media.id}`);
   };
 
   return (
@@ -91,24 +87,6 @@ const SearchPage: React.FC = () => {
                 onClick={handleMediaClick}
               />
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Torrents */}
-      {selectedMedia && (
-        <div className="space-y-4 animate-fade-in-up">
-          <div className="glass rounded-2xl p-6">
-            <h3 className="font-display text-xl font-bold text-foreground mb-1">
-              Torrents para: {selectedMedia.title || selectedMedia.name}
-            </h3>
-            <p className="text-muted-foreground text-sm mb-4">
-              Selecione um torrent para iniciar o download
-            </p>
-            <TorrentList
-              torrents={torrentResults?.data || []}
-              onDownload={handleDownload}
-            />
           </div>
         </div>
       )}
