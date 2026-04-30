@@ -2,7 +2,7 @@
 from pydantic_settings import BaseSettings
 from pydantic import Field, ConfigDict
 from functools import lru_cache
-from typing import Optional
+
 
 class Settings(BaseSettings):
     # Database
