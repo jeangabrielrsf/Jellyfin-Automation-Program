@@ -1,8 +1,9 @@
 """Download model."""
+import enum
+
 from sqlalchemy import Column, Integer, String, Float, DateTime, Enum, Text
 from sqlalchemy.sql import func
 from app.database import Base
-import enum
 
 class ContentType(str, enum.Enum):
     MOVIE = "movie"

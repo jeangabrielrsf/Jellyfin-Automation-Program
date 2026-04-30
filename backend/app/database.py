@@ -1,5 +1,5 @@
 """Database configuration and session management."""
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from app.config import get_settings

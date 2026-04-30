@@ -9,6 +9,7 @@ from sqlalchemy import pool
 
 from alembic import context
 
+from app.config import get_settings
 from app.database import Base
 from app.models import Download, Setting  # noqa: F401
 
@@ -45,6 +46,8 @@ def run_migrations_offline() -> None:
     script output.
 
     """
+    settings = get_settings()
+    config.set_main_option("sqlalchemy.url", settings.database_url)
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -64,6 +67,8 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    settings = get_settings()
+    config.set_main_option("sqlalchemy.url", settings.database_url)
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
