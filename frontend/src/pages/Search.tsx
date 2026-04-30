@@ -58,32 +58,58 @@ const SearchPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Buscar Conteúdo</h2>
-      
+    <div className="space-y-8 animate-fade-in">
+      {/* Header */}
+      <div className="text-center space-y-4">
+        <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">
+          Buscar Conteúdo
+        </h2>
+        <p className="text-muted-foreground max-w-xl mx-auto">
+          Pesquise por filmes, séries ou animes no banco de dados do TMDB
+        </p>
+      </div>
+
+      {/* Search */}
       <SearchBar onSearch={handleSearch} isLoading={isSearching} />
 
+      {/* Results */}
       {searchResults?.data?.results && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {searchResults.data.results.map((media: TMDBSearchResult) => (
-            <MediaCard
-              key={media.id}
-              media={media}
-              onClick={handleMediaClick}
-            />
-          ))}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-display text-xl font-bold text-foreground">
+              Resultados
+            </h3>
+            <span className="text-sm text-muted-foreground">
+              {searchResults.data.results.length} encontrados
+            </span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {searchResults.data.results.map((media: TMDBSearchResult) => (
+              <MediaCard
+                key={media.id}
+                media={media}
+                onClick={handleMediaClick}
+              />
+            ))}
+          </div>
         </div>
       )}
 
+      {/* Torrents */}
       {selectedMedia && (
-        <div className="space-y-4">
-          <h3 className="text-xl font-semibold">
-            Torrents para: {selectedMedia.title || selectedMedia.name}
-          </h3>
-          <TorrentList
-            torrents={torrentResults?.data || []}
-            onDownload={handleDownload}
-          />
+        <div className="space-y-4 animate-fade-in-up">
+          <div className="glass rounded-2xl p-6">
+            <h3 className="font-display text-xl font-bold text-foreground mb-1">
+              Torrents para: {selectedMedia.title || selectedMedia.name}
+            </h3>
+            <p className="text-muted-foreground text-sm mb-4">
+              Selecione um torrent para iniciar o download
+            </p>
+            <TorrentList
+              torrents={torrentResults?.data || []}
+              onDownload={handleDownload}
+            />
+          </div>
         </div>
       )}
     </div>
