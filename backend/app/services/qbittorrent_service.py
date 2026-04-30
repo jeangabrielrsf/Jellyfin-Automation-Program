@@ -34,7 +34,7 @@ class QBittorrentService:
             else:
                 logger.error("qBittorrent authentication failed", response=response.text)
                 return False
-        except (httpx.HTTPError, httpx.RequestError) as e:
+        except httpx.HTTPError as e:
             logger.error("qBittorrent authentication error", error=str(e))
             return False
     
@@ -79,15 +79,15 @@ class QBittorrentService:
             logger.error("Failed to get torrents", error=str(e))
             return []
     
-    async def get_torrent(self, hash: str) -> Optional[Dict]:
+    async def get_torrent(self, torrent_hash: str) -> Optional[Dict]:
         """Get specific torrent by hash."""
         torrents = await self.get_torrents()
         for torrent in torrents:
-            if torrent.get("hash") == hash:
+            if torrent.get("hash") == torrent_hash:
                 return torrent
         return None
     
-    async def pause_torrent(self, hash: str) -> bool:
+    async def pause_torrent(self, torrent_hash: str) -> bool:
         """Pause a torrent."""
         if not await self._authenticate():
             return False
@@ -95,7 +95,7 @@ class QBittorrentService:
         try:
             response = await self.client.post(
                 f"{self.settings.qbittorrent_host}/api/v2/torrents/pause",
-                data={"hashes": hash}
+                data={"hashes": torrent_hash}
             )
             response.raise_for_status()
             return True
@@ -104,7 +104,7 @@ class QBittorrentService:
             logger.error("Failed to pause torrent", error=str(e))
             return False
     
-    async def resume_torrent(self, hash: str) -> bool:
+    async def resume_torrent(self, torrent_hash: str) -> bool:
         """Resume a torrent."""
         if not await self._authenticate():
             return False
@@ -112,7 +112,7 @@ class QBittorrentService:
         try:
             response = await self.client.post(
                 f"{self.settings.qbittorrent_host}/api/v2/torrents/resume",
-                data={"hashes": hash}
+                data={"hashes": torrent_hash}
             )
             response.raise_for_status()
             return True
@@ -121,7 +121,7 @@ class QBittorrentService:
             logger.error("Failed to resume torrent", error=str(e))
             return False
     
-    async def delete_torrent(self, hash: str, delete_files: bool = False) -> bool:
+    async def delete_torrent(self, torrent_hash: str, delete_files: bool = False) -> bool:
         """Delete a torrent."""
         if not await self._authenticate():
             return False
@@ -130,7 +130,7 @@ class QBittorrentService:
             response = await self.client.post(
                 f"{self.settings.qbittorrent_host}/api/v2/torrents/delete",
                 data={
-                    "hashes": hash,
+                    "hashes": torrent_hash,
                     "deleteFiles": str(delete_files).lower()
                 }
             )
