@@ -22,11 +22,15 @@ export const searchAPI = {
   
   getTVDetail: (id: number) =>
     api.get(`/search/tv/${id}`),
+
+  getTVSeasons: (id: number) =>
+    api.get(`/search/tv/${id}/seasons`),
   
   searchTorrents: (params: {
     tmdb_id: number;
-    title: string;
     media_type: string;
+    season?: number;
+    episode?: number;
     quality?: string;
     language?: string;
   }) => api.get('/search/torrents', {
