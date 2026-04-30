@@ -16,6 +16,10 @@ class TMDBService:
         self.settings = get_settings()
         self.api_key = self.settings.tmdb_api_key
         self.client = httpx.AsyncClient(timeout=30.0)
+
+    async def close(self):
+        """Close the HTTP client."""
+        await self.client.aclose()
     
     async def search(self, query: str, page: int = 1) -> TMDBSearchResponse:
         """Search for movies and TV shows."""
@@ -44,10 +48,10 @@ class TMDBService:
             page=data.get("page", 1),
             results=results,
             total_pages=data.get("total_pages", 0),
-            total_results=data.get("total_results", 0)
+            total_results=len(results)
         )
     
-    async def get_movie_detail(self, movie_id: int) -> Optional[TMDBDetail]:
+    async def get_movie_detail(self, movie_id: int) -> TMDBDetail:
         """Get movie details by ID."""
         logger.info("Getting movie details", movie_id=movie_id)
         
@@ -62,7 +66,7 @@ class TMDBService:
         response.raise_for_status()
         return TMDBDetail(**response.json())
     
-    async def get_tv_detail(self, tv_id: int) -> Optional[TMDBDetail]:
+    async def get_tv_detail(self, tv_id: int) -> TMDBDetail:
         """Get TV show details by ID."""
         logger.info("Getting TV details", tv_id=tv_id)
         

@@ -23,8 +23,8 @@ class TMDBSearchResult(BaseModel):
     @property
     def year(self) -> Optional[int]:
         date = self.release_date or self.first_air_date
-        if date:
-            return int(date.split("-")[0])
+        if date and len(date) >= 4 and date[:4].isdigit():
+            return int(date[:4])
         return None
 
 
@@ -59,8 +59,8 @@ class TMDBDetail(BaseModel):
     @property
     def year(self) -> Optional[int]:
         date = self.release_date or self.first_air_date
-        if date:
-            return int(date.split("-")[0])
+        if date and len(date) >= 4 and date[:4].isdigit():
+            return int(date[:4])
         return None
     
     @property

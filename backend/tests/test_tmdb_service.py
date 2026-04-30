@@ -6,7 +6,9 @@ from app.services.tmdb_service import TMDBService
 
 @pytest.fixture
 def tmdb_service():
-    return TMDBService()
+    with patch("app.services.tmdb_service.get_settings") as mock_settings:
+        mock_settings.return_value.tmdb_api_key = "test-key"
+        yield TMDBService()
 
 
 @pytest.mark.asyncio
@@ -41,7 +43,7 @@ async def test_search_returns_results(tmdb_service):
     }
     mock_response.raise_for_status = MagicMock()
     
-    with patch.object(tmdb_service.client, 'get', return_value=mock_response):
+    with patch.object(tmdb_service.client, 'get', AsyncMock(return_value=mock_response)):
         result = await tmdb_service.search("test")
         assert len(result.results) == 2
         assert result.results[0].display_title == "Test Movie"
@@ -78,7 +80,7 @@ async def test_search_filters_non_media(tmdb_service):
     }
     mock_response.raise_for_status = MagicMock()
     
-    with patch.object(tmdb_service.client, 'get', return_value=mock_response):
+    with patch.object(tmdb_service.client, 'get', AsyncMock(return_value=mock_response)):
         result = await tmdb_service.search("test")
         assert len(result.results) == 1
         assert result.results[0].media_type == "movie"
@@ -101,7 +103,7 @@ async def test_get_movie_detail_returns_detail(tmdb_service):
     }
     mock_response.raise_for_status = MagicMock()
     
-    with patch.object(tmdb_service.client, 'get', return_value=mock_response):
+    with patch.object(tmdb_service.client, 'get', AsyncMock(return_value=mock_response)):
         result = await tmdb_service.get_movie_detail(1)
         assert result is not None
         assert result.display_title == "Test Movie"
@@ -130,7 +132,7 @@ async def test_get_tv_detail_returns_detail(tmdb_service):
     }
     mock_response.raise_for_status = MagicMock()
     
-    with patch.object(tmdb_service.client, 'get', return_value=mock_response):
+    with patch.object(tmdb_service.client, 'get', AsyncMock(return_value=mock_response)):
         result = await tmdb_service.get_tv_detail(2)
         assert result is not None
         assert result.display_title == "Test TV Show"
@@ -150,6 +152,26 @@ async def test_search_http_error_raises(tmdb_service):
         response=MagicMock(status_code=404)
     )
     
-    with patch.object(tmdb_service.client, 'get', return_value=mock_response):
+    with patch.object(tmdb_service.client, 'get', AsyncMock(return_value=mock_response)):
         with pytest.raises(httpx.HTTPStatusError):
             await tmdb_service.search("test")
+
+
+@pytest.mark.asyncio
+async def test_get_movie_detail_http_error_raises(tmdb_service):
+    mock_response = MagicMock()
+    mock_response.raise_for_status.side_effect = Exception("HTTP Error")
+    
+    with patch.object(tmdb_service.client, 'get', AsyncMock(return_value=mock_response)):
+        with pytest.raises(Exception):
+            await tmdb_service.get_movie_detail(123)
+
+
+@pytest.mark.asyncio
+async def test_get_tv_detail_http_error_raises(tmdb_service):
+    mock_response = MagicMock()
+    mock_response.raise_for_status.side_effect = Exception("HTTP Error")
+    
+    with patch.object(tmdb_service.client, 'get', AsyncMock(return_value=mock_response)):
+        with pytest.raises(Exception):
+            await tmdb_service.get_tv_detail(456)
