@@ -1,5 +1,5 @@
 """TMDB Pydantic models."""
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 from typing import List, Optional
 
 
@@ -16,10 +16,12 @@ class TMDBSearchResult(BaseModel):
     media_type: str
     genre_ids: List[int] = []
     
+    @computed_field
     @property
     def display_title(self) -> str:
         return self.title or self.name or "Unknown"
     
+    @computed_field
     @property
     def year(self) -> Optional[int]:
         date = self.release_date or self.first_air_date
@@ -55,10 +57,12 @@ class TMDBDetail(BaseModel):
     tagline: Optional[str] = None
     seasons: List[dict] = []
     
+    @computed_field
     @property
     def display_title(self) -> str:
         return self.title or self.name or "Unknown"
     
+    @computed_field
     @property
     def year(self) -> Optional[int]:
         date = self.release_date or self.first_air_date

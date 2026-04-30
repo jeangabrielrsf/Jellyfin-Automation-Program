@@ -15,7 +15,9 @@ export interface TMDBSearchResult {
 export interface TMDBDetail {
   id: number;
   title?: string;
+  original_title?: string;
   name?: string;
+  original_name?: string;
   overview: string;
   poster_path: string | null;
   backdrop_path: string | null;
@@ -28,6 +30,8 @@ export interface TMDBDetail {
   number_of_episodes?: number;
   status?: string;
   tagline?: string;
+  display_title: string;
+  year?: number;
 }
 
 export interface TorrentResult {
