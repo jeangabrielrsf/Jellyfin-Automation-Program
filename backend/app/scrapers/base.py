@@ -11,7 +11,7 @@ class BaseScraper(ABC):
     priority: int = 100
     
     @abstractmethod
-    async def search(self, query: str, type: str, quality: str = "1080p", language: str = "legendado") -> List[TorrentResult]:
+    async def search(self, query: str, media_type: str, quality: str = "1080p", language: str = "legendado") -> List[TorrentResult]:
         """Search for torrents."""
         pass
     

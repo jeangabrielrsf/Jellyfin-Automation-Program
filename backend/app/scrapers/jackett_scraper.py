@@ -1,6 +1,7 @@
 """Jackett scraper implementation."""
-import httpx
+import json
 import re
+import httpx
 from typing import List
 from app.scrapers.base import BaseScraper
 from app.models.torrent import TorrentResult
@@ -19,9 +20,9 @@ class JackettScraper(BaseScraper):
         self.settings = get_settings()
         self.client = httpx.AsyncClient(timeout=60.0)
     
-    async def search(self, query: str, type: str, quality: str = "1080p", language: str = "legendado") -> List[TorrentResult]:
+    async def search(self, query: str, media_type: str, quality: str = "1080p", language: str = "legendado") -> List[TorrentResult]:
         """Search for torrents via Jackett."""
-        logger.info("Searching Jackett", query=query, type=type, quality=quality)
+        logger.info("Searching Jackett", query=query, media_type=media_type, quality=quality)
         
         if not self.settings.jackett_api_key:
             logger.warning("Jackett API key not configured")
@@ -31,7 +32,7 @@ class JackettScraper(BaseScraper):
         params = {
             "apikey": self.settings.jackett_api_key,
             "Query": query,
-            "Category": self._get_category(type)
+            "Category": self._get_category(media_type)
         }
         
         try:
@@ -61,22 +62,22 @@ class JackettScraper(BaseScraper):
             logger.info("Jackett search completed", results_count=len(results))
             return results
             
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, json.JSONDecodeError) as e:
             logger.error("Jackett search failed", error=str(e))
             return []
     
-    async def get_magnet(self, torrent_id: str) -> str:
-        """Get magnet link."""
-        return torrent_id
+    async def get_magnet(self, magnet_url: str) -> str:
+        """Return the magnet URL (Jackett already provides the magnet link in search results)."""
+        return magnet_url
     
-    def _get_category(self, type: str) -> List[int]:
+    def _get_category(self, media_type: str) -> List[int]:
         """Get Jackett category IDs based on content type."""
         categories = {
             "movie": [2000],
             "series": [5000],
             "anime": [5070]
         }
-        return categories.get(type, [2000, 5000])
+        return categories.get(media_type, [2000, 5000])
     
     def _format_size(self, size_bytes: int) -> str:
         """Format size in human readable format."""
@@ -97,7 +98,7 @@ class JackettScraper(BaseScraper):
     def _extract_language(self, title: str) -> str:
         """Extract language from title."""
         title_lower = title.lower()
-        if 'dual' in title_lower or 'dublado' in title_lower:
+        if 'dual' in title_lower:
             return "Dual Áudio"
         elif 'dublado' in title_lower or 'dub' in title_lower:
             return "Dublado"

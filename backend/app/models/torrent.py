@@ -20,7 +20,7 @@ class TorrentResult(BaseModel):
 
 class TorrentSearchRequest(BaseModel):
     query: str
-    type: str
+    media_type: str
     quality: Optional[str] = "1080p"
     language: Optional[str] = "legendado"
     tmdb_id: Optional[int] = None
