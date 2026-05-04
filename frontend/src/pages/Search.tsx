@@ -50,7 +50,8 @@ const SearchPage: React.FC = () => {
         scrollY: window.scrollY,
       })
     );
-    navigate(`/detail/${media.media_type}/${media.id}`);
+    const params = new URLSearchParams({ q: searchQuery });
+    navigate(`/detail/${media.media_type}/${media.id}?${params.toString()}`);
   };
 
   return (
