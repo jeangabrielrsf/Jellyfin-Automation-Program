@@ -1,8 +1,8 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15-alpine
+    init: true
+    stop_grace_period: 10s
     environment:
       POSTGRES_DB: jellyfin_automation
       POSTGRES_USER: jfa_user
@@ -19,14 +19,16 @@ services:
 
   backend:
     build: ./backend
+    init: true
+    stop_grace_period: 10s
     environment:
       DATABASE_URL: postgresql://jfa_user:jfa_password@db:5432/jellyfin_automation
       TMDB_API_KEY: ${TMDB_API_KEY:-}
       JACKETT_URL: ${JACKETT_URL:-http://jackett:9117}
       JACKETT_API_KEY: ${JACKETT_API_KEY:-}
-      QBITTORRENT_HOST: ${QBITTORRENT_HOST:-http://qbittorrent:8080}
-      QBITTORRENT_USERNAME: ${QBITTORRENT_USERNAME:-admin}
-      QBITTORRENT_PASSWORD: ${QBITTORRENT_PASSWORD:-adminadmin}
+      QBITTORRENT_HOST: ${QBITTORRENT_HOST:-http://host.docker.internal:8080}
+      QBITTORRENT_USERNAME: ${QBITTORRENT_USERNAME:-jeanfrusca}
+      QBITTORRENT_PASSWORD: ${QBITTORRENT_PASSWORD:-VamosCodar!96}
       JELLYFIN_URL: ${JELLYFIN_URL:-http://jellyfin:8096}
       JELLYFIN_API_KEY: ${JELLYFIN_API_KEY:-}
       MOVIES_PATH: /movies
@@ -46,6 +48,8 @@ services:
 
   frontend:
     build: ./frontend
+    init: true
+    stop_grace_period: 10s
     ports:
       - "3001:80"
     depends_on:
