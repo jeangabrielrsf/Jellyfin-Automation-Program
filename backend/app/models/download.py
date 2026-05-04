@@ -25,6 +25,8 @@ class Download(Base):
     tmdb_id = Column(Integer, nullable=False)
     title = Column(String(255), nullable=False)
     type = Column(Enum(ContentType), nullable=False)
+    season = Column(Integer)
+    episode = Column(Integer)
     
     torrent_name = Column(String(500))
     torrent_hash = Column(String(64), unique=True)
