@@ -145,6 +145,14 @@ Nenhuma mudança necessária no modelo `Download` - já tem os campos:
 2. **Teste do PathResolver:** Verificar extração de season/episode e criação de paths
 3. **Teste de integração:** Criar download, verificar que savepath é correto
 
+## Future Improvements
+
+- **Real-time updates via WebSocket:** Currently the frontend polls the backend every 5 seconds. In the future, the `DownloadWorker` should broadcast progress updates via the existing `/ws` WebSocket endpoint so the UI updates instantly without polling.
+
+## Post-Implementation Tasks
+
+- Update `AGENTS.md` with new conventions and patterns introduced by this feature.
+
 ## Implementation Order
 
 1. Implementar `PathResolver` e passar savepath para qBittorrent
