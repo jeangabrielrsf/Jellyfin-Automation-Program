@@ -83,6 +83,11 @@ export const settingsAPI = {
     api.put(`/settings/${key}`, value),
 };
 
+export const filesystemAPI = {
+  getRoot: () => api.get('/filesystem/root'),
+  getDirs: (path: string) => api.get('/filesystem/dirs', { params: { path } }),
+};
+
 export const logsAPI = {
   getLogs: (params?: { level?: string; lines?: number; search?: string }) =>
     api.get('/logs', { params }),
