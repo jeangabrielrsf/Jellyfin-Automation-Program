@@ -33,28 +33,34 @@ export const searchAPI = {
     episode?: number;
     quality?: string;
     language?: string;
-  }) => api.get('/search/torrents', {
-    params: {
+    query?: string;
+  }) => {
+    const apiParams: Record<string, unknown> = {
       ...params,
       media_type: mapMediaType(params.media_type),
+    };
+    if (params.query) {
+      apiParams.query = params.query;
     }
-  }),
+    return api.get('/search/torrents', { params: apiParams });
+  },
 };
 
 export const downloadAPI = {
   listDownloads: (status?: string) =>
-    api.get('/downloads', { params: { status } }),
+    api.get('/downloads/', { params: { status } }),
   
   createDownload: (data: {
     tmdb_id: number;
     title: string;
     media_type: string;
     torrent_name: string;
-    magnet_link: string;
+    magnet_link?: string;
+    download_url?: string;
     quality?: string;
     language_preference?: string;
     indexer_used?: string;
-  }) => api.post('/downloads', {
+  }) => api.post('/downloads/', {
     ...data,
     media_type: mapMediaType(data.media_type),
   }),

@@ -62,6 +62,7 @@ export interface Download {
   progress: number;
   speed?: string;
   eta?: string;
+  error_message?: string;
   created_at: string;
 }
 
