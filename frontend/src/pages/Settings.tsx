@@ -5,8 +5,6 @@ import { settingsAPI } from '../services/api';
 import { Button } from '@/components/ui/button';
 import FolderPickerDialog from '@/components/FolderPickerDialog';
 
-const pathKeys = ['movies_path', 'series_path', 'animes_path'];
-
 const settingGroups = [
   {
     icon: Folder,
