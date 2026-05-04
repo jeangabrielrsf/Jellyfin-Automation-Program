@@ -172,11 +172,48 @@ class TestDownloadsRouter:
             "quality": "1080p",
             "language_preference": "legendado"
         }
-        response = client.post("/api/downloads/", json=payload)
+        with patch('app.routers.downloads.QBittorrentService') as mock_service_class:
+            mock_instance = mock_service_class.return_value
+            mock_instance.add_torrent = AsyncMock(return_value=True)
+            mock_instance.close = AsyncMock()
+            response = client.post("/api/downloads/", json=payload)
         assert response.status_code == 200
         data = response.json()
         assert data["title"] == "Test Movie"
-        assert data["status"] == "pending"
+        assert data["status"] == "downloading"
+        assert data["torrent_name"] == "Test Movie 1080p"
+        assert data["type"] == "movie"
+        mock_instance.add_torrent.assert_awaited_once()
+        mock_instance.close.assert_awaited_once()
+
+    def test_create_download_with_season_episode(self, client, db_session):
+        """Test creating a download with season and episode."""
+        payload = {
+            "tmdb_id": 2,
+            "title": "Test Show",
+            "media_type": "series",
+            "torrent_name": "Test.Show.S01E05.1080p",
+            "magnet_link": "magnet:?xt=urn:btih:test2",
+            "quality": "1080p",
+            "language_preference": "legendado",
+            "season": 1,
+            "episode": 5
+        }
+        with patch('app.routers.downloads.QBittorrentService') as mock_service_class:
+            mock_instance = mock_service_class.return_value
+            mock_instance.add_torrent = AsyncMock(return_value=True)
+            mock_instance.close = AsyncMock()
+            response = client.post("/api/downloads/", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["title"] == "Test Show"
+        assert data["status"] == "downloading"
+        assert data["season"] == 1
+        assert data["episode"] == 5
+        assert data["source_folder"] is not None
+        assert "Test Show" in data["source_folder"]
+        mock_instance.add_torrent.assert_awaited_once()
+        mock_instance.close.assert_awaited_once()
 
     def test_get_download(self, client, db_session):
         """Test getting a specific download."""

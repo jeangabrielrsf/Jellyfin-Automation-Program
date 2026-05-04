@@ -69,15 +69,20 @@ async def create_download(
         season = extracted.get("season")
         episode = extracted.get("episode")
     
-    save_path = path_resolver.resolve_path(
-        title=download.title,
-        media_type=download.media_type.value,
-        torrent_name=download.torrent_name,
-        season=season,
-        episode=episode,
-        year=download.year,
-        quality=download.quality
-    )
+    try:
+        save_path = path_resolver.resolve_path(
+            title=download.title,
+            media_type=download.media_type.value,
+            torrent_name=download.torrent_name,
+            season=season,
+            episode=episode,
+            year=download.year,
+            quality=download.quality
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create download directory: {str(e)}")
     
     db_download = Download(
         tmdb_id=download.tmdb_id,

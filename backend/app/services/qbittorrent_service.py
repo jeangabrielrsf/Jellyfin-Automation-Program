@@ -43,7 +43,7 @@ class QBittorrentService:
     
     async def add_torrent(self, magnet_link: Optional[str] = None, download_url: Optional[str] = None, save_path: Optional[str] = None, category: Optional[str] = None, torrent_name: Optional[str] = None) -> bool:
         """Add torrent to qBittorrent."""
-        logger.info("Adding torrent to qBittorrent", magnet_link=magnet_link[:50] if magnet_link else None, download_url=download_url[:50] if download_url else None, category=category)
+        logger.info("Adding torrent to qBittorrent", magnet_link=magnet_link[:50] if magnet_link else None, download_url=download_url[:50] if download_url else None, save_path=save_path, category=category)
         if not await self._authenticate():
             logger.error("Cannot add torrent: authentication failed")
             return False
@@ -56,16 +56,18 @@ class QBittorrentService:
         
         is_magnet = link.strip().startswith("magnet:")
         
+        # Build common data dict
+        data = {}
+        if save_path:
+            data["savepath"] = save_path
+        if category:
+            data["category"] = category
+        
         try:
             add_url = f"{self.settings.qbittorrent_host}/api/v2/torrents/add"
             
             if is_magnet:
-                data = {"urls": link}
-                if save_path:
-                    data["savepath"] = save_path
-                if category:
-                    data["category"] = category
-                
+                data["urls"] = link
                 logger.info("Sending magnet link to qBittorrent", url=add_url)
                 response = await self.client.post(
                     add_url,
@@ -89,11 +91,7 @@ class QBittorrentService:
                             # Check if the fresh link is a magnet link
                             if fresh_link.strip().startswith("magnet:"):
                                 logger.info("Fresh link is a magnet link, sending directly to qBittorrent")
-                                data = {"urls": fresh_link}
-                                if save_path:
-                                    data["savepath"] = save_path
-                                if category:
-                                    data["category"] = category
+                                data["urls"] = fresh_link
                                 response = await self.client.post(add_url, data=data)
                                 logger.info("qBittorrent add response (fresh magnet)", status=response.status_code, text=response.text)
                                 response.raise_for_status()
@@ -113,11 +111,6 @@ class QBittorrentService:
                         raise
                 
                 files = {"torrents": ("torrent.torrent", torrent_response.content, "application/x-bittorrent")}
-                data = {}
-                if save_path:
-                    data["savepath"] = save_path
-                if category:
-                    data["category"] = category
                 
                 logger.info("Uploading .torrent file to qBittorrent", url=add_url)
                 response = await self.client.post(
