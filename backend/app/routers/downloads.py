@@ -1,22 +1,36 @@
 """Downloads router."""
+import re
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.database import get_db
 from app.models.download import Download, DownloadStatus, ContentType
+from app.services.qbittorrent_service import QBittorrentService
+from app.logging_config import get_logger
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/downloads", tags=["downloads"])
+logger = get_logger(__name__)
 
 class DownloadCreate(BaseModel):
     tmdb_id: int
     title: str
     media_type: ContentType
     torrent_name: str
-    magnet_link: str
+    magnet_link: Optional[str] = None
+    download_url: Optional[str] = None
     quality: str = "1080p"
     language_preference: str = "legendado"
     indexer_used: Optional[str] = None
+
+
+def _extract_hash_from_magnet(magnet_link: str) -> Optional[str]:
+    """Extract btih hash from a magnet link."""
+    match = re.search(r"xt=urn:btih:([a-fA-F0-9]{40})", magnet_link)
+    if match:
+        return match.group(1).lower()
+    return None
+
 
 @router.get("/")
 def list_downloads(
@@ -30,17 +44,24 @@ def list_downloads(
     return query.order_by(Download.created_at.desc()).all()
 
 @router.post("/")
-def create_download(
+async def create_download(
     download: DownloadCreate,
     db: Session = Depends(get_db)
 ):
-    """Create a new download record."""
+    """Create a new download record and add torrent to qBittorrent."""
+    # Determine which link to use
+    magnet_link = download.magnet_link
+    download_url = download.download_url
+    
+    # If no magnet link but has download_url, use download_url as magnet_link for storage
+    link_to_store = magnet_link if magnet_link else download_url
+    
     db_download = Download(
         tmdb_id=download.tmdb_id,
         title=download.title,
         type=download.media_type,
         torrent_name=download.torrent_name,
-        magnet_link=download.magnet_link,
+        magnet_link=link_to_store,
         quality=download.quality,
         language_preference=download.language_preference,
         status=DownloadStatus.PENDING,
@@ -50,10 +71,49 @@ def create_download(
         db.add(db_download)
         db.commit()
         db.refresh(db_download)
-        return db_download
     except Exception:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error")
+    
+    # Try to add torrent to qBittorrent immediately
+    logger.info("Creating download", magnet_link=magnet_link, download_url=download_url, torrent_name=download.torrent_name)
+    service = QBittorrentService()
+    try:
+        success = await service.add_torrent(
+            magnet_link=magnet_link,
+            download_url=download_url,
+            category=download.media_type.value,
+            torrent_name=download.torrent_name
+        )
+        if success:
+            # Try to extract hash from magnet link
+            hash_source = magnet_link if magnet_link else download_url
+            torrent_hash = _extract_hash_from_magnet(hash_source) if hash_source and hash_source.startswith("magnet:") else None
+            if torrent_hash:
+                db_download.torrent_hash = torrent_hash
+            db_download.status = DownloadStatus.DOWNLOADING
+            db.commit()
+            db.refresh(db_download)
+            logger.info("Torrent added to qBittorrent", download_id=db_download.id)
+            return db_download
+        else:
+            db_download.status = DownloadStatus.FAILED
+            db_download.error_message = "Failed to add torrent to qBittorrent"
+            db.commit()
+            db.refresh(db_download)
+            logger.error("Failed to add torrent to qBittorrent", download_id=db_download.id)
+            raise HTTPException(status_code=502, detail="Falha ao adicionar torrent ao qBittorrent. Verifique se o qBittorrent está em execução.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        db_download.status = DownloadStatus.FAILED
+        db_download.error_message = str(e)
+        db.commit()
+        db.refresh(db_download)
+        logger.error("Exception while adding torrent to qBittorrent", error=str(e), download_id=db_download.id)
+        raise HTTPException(status_code=502, detail=f"Erro ao comunicar com qBittorrent: {str(e)}")
+    finally:
+        await service.close()
 
 @router.get("/{download_id}")
 def get_download(download_id: int, db: Session = Depends(get_db)):
