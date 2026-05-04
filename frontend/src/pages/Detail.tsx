@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useMemo } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Download, Play, Info } from 'lucide-react';
+import { ArrowLeft, Download, Play, Info, Search, SearchCheck } from 'lucide-react';
+import { toast } from 'sonner';
 import { searchAPI, downloadAPI } from '../services/api';
 import { TorrentResult } from '../types';
 
@@ -13,6 +14,9 @@ const DetailPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'torrents' | 'info'>('torrents');
   const [selectedSeason, setSelectedSeason] = useState<number | ''>('');
   const [selectedEpisode, setSelectedEpisode] = useState<number | 'temporada-inteira'>('temporada-inteira');
+  const [customSearchEnabled, setCustomSearchEnabled] = useState(false);
+  const [customQuery, setCustomQuery] = useState('');
+  const [searchParams] = useSearchParams();
 
   const isTV = mediaType === 'tv';
 
@@ -32,13 +36,14 @@ const DetailPage: React.FC = () => {
   });
 
   const { data: torrentResults, isLoading: torrentsLoading, refetch: refetchTorrents } = useQuery({
-    queryKey: ['torrents', tmdbId, selectedSeason, selectedEpisode],
+    queryKey: ['torrents', tmdbId, selectedSeason, selectedEpisode, customSearchEnabled, customQuery],
     queryFn: () =>
       searchAPI.searchTorrents({
         tmdb_id: tmdbId,
         media_type: mediaType || 'movie',
         season: selectedSeason ? Number(selectedSeason) : undefined,
         episode: selectedEpisode !== 'temporada-inteira' ? Number(selectedEpisode) : undefined,
+        query: customSearchEnabled && customQuery.trim() ? customQuery.trim() : undefined,
       }),
     enabled: !isTV, // TV torrents only load after user clicks "Buscar"
   });
@@ -55,20 +60,56 @@ const DetailPage: React.FC = () => {
         title: detail?.data?.display_title || '',
         media_type: mediaType || 'movie',
         torrent_name: torrent.title,
-        magnet_link: torrent.magnet_url || torrent.download_url || '',
+        magnet_link: torrent.magnet_url || undefined,
+        download_url: torrent.download_url || undefined,
         quality: torrent.quality || '1080p',
         language_preference: torrent.language || 'legendado',
         indexer_used: torrent.indexer,
       });
-      alert('Download iniciado com sucesso!');
+      toast.success('Download iniciado com sucesso!');
     } catch (error) {
       console.error('Failed to start download:', error);
-      alert('Erro ao iniciar download.');
+      toast.error('Erro ao iniciar download.');
     }
   };
 
   const media = detail?.data;
   const seasons = seasonsData?.data || [];
+
+  const tmdbSearchTerm = useMemo(() => {
+    if (!media) return '';
+    if (mediaType === 'movie') {
+      return media.original_title || media.title || '';
+    }
+    return media.original_name || media.name || '';
+  }, [media, mediaType]);
+
+  const effectiveQuery = useMemo(() => {
+    if (customSearchEnabled && customQuery.trim()) {
+      return customQuery.trim();
+    }
+    return tmdbSearchTerm;
+  }, [customSearchEnabled, customQuery, tmdbSearchTerm]);
+
+  const querySuffix = useMemo(() => {
+    if (selectedSeason && selectedEpisode !== 'temporada-inteira') {
+      return ` S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode).padStart(2, '0')}`;
+    }
+    if (selectedSeason) {
+      return ` S${String(selectedSeason).padStart(2, '0')}`;
+    }
+    return '';
+  }, [selectedSeason, selectedEpisode]);
+
+  const effectiveQueryWithSuffix = `${effectiveQuery}${querySuffix}`;
+
+  const urlQuery = searchParams.get('q') || '';
+
+  React.useEffect(() => {
+    if (urlQuery && !customQuery) {
+      setCustomQuery(urlQuery);
+    }
+  }, [urlQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const episodeOptions = React.useMemo(() => {
     if (!selectedSeason) return [];
@@ -213,6 +254,48 @@ const DetailPage: React.FC = () => {
               </button>
             </div>
           )}
+
+          {/* Search term info and custom search toggle */}
+          <div className="glass rounded-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                {customSearchEnabled ? (
+                  <SearchCheck className="w-4 h-4 text-primary" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+                <span>
+                  Buscando com:{' '}
+                  <strong className="text-foreground">{effectiveQueryWithSuffix || effectiveQuery || '—'}</strong>
+                </span>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <span className="text-sm text-muted-foreground">Busca customizada</span>
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={customSearchEnabled}
+                    onChange={(e) => setCustomSearchEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-muted rounded-full peer-checked:bg-primary transition-colors" />
+                  <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-background rounded-full transition-transform peer-checked:translate-x-4 shadow-sm" />
+                </div>
+              </label>
+            </div>
+            {customSearchEnabled && (
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Termo de busca customizado</label>
+                <input
+                  type="text"
+                  value={customQuery}
+                  onChange={(e) => setCustomQuery(e.target.value)}
+                  placeholder="Digite o termo de busca desejado..."
+                  className="w-full px-4 py-2 rounded-xl glass bg-background/50 border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+            )}
+          </div>
 
           <div className="glass rounded-2xl p-6">
             <h3 className="font-display text-xl font-bold text-foreground mb-4">
