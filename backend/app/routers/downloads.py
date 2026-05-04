@@ -6,6 +6,7 @@ from typing import Optional
 from app.database import get_db
 from app.models.download import Download, DownloadStatus, ContentType
 from app.services.qbittorrent_service import QBittorrentService
+from app.services.path_resolver import PathResolver
 from app.logging_config import get_logger
 from pydantic import BaseModel
 
@@ -22,6 +23,9 @@ class DownloadCreate(BaseModel):
     quality: str = "1080p"
     language_preference: str = "legendado"
     indexer_used: Optional[str] = None
+    season: Optional[int] = None
+    episode: Optional[int] = None
+    year: Optional[int] = None
 
 
 def _extract_hash_from_magnet(magnet_link: str) -> Optional[str]:
@@ -56,6 +60,25 @@ async def create_download(
     # If no magnet link but has download_url, use download_url as magnet_link for storage
     link_to_store = magnet_link if magnet_link else download_url
     
+    # Resolve save path using PathResolver
+    path_resolver = PathResolver()
+    season = download.season
+    episode = download.episode
+    if season is None and download.torrent_name:
+        extracted = path_resolver.extract_season_episode(download.torrent_name)
+        season = extracted.get("season")
+        episode = extracted.get("episode")
+    
+    save_path = path_resolver.resolve_path(
+        title=download.title,
+        media_type=download.media_type.value,
+        torrent_name=download.torrent_name,
+        season=season,
+        episode=episode,
+        year=download.year,
+        quality=download.quality
+    )
+    
     db_download = Download(
         tmdb_id=download.tmdb_id,
         title=download.title,
@@ -65,7 +88,10 @@ async def create_download(
         quality=download.quality,
         language_preference=download.language_preference,
         status=DownloadStatus.PENDING,
-        indexer_used=download.indexer_used
+        indexer_used=download.indexer_used,
+        season=season,
+        episode=episode,
+        source_folder=save_path
     )
     try:
         db.add(db_download)
@@ -83,7 +109,8 @@ async def create_download(
             magnet_link=magnet_link,
             download_url=download_url,
             category=download.media_type.value,
-            torrent_name=download.torrent_name
+            torrent_name=download.torrent_name,
+            save_path=save_path
         )
         if success:
             # Try to extract hash from magnet link
