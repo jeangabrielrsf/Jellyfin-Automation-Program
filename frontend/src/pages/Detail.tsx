@@ -65,6 +65,8 @@ const DetailPage: React.FC = () => {
         quality: torrent.quality || '1080p',
         language_preference: torrent.language || 'legendado',
         indexer_used: torrent.indexer,
+        season: selectedSeason ? Number(selectedSeason) : undefined,
+        episode: selectedEpisode !== 'temporada-inteira' ? Number(selectedEpisode) : undefined,
       });
       toast.success('Download iniciado com sucesso!');
     } catch (error) {

@@ -60,6 +60,8 @@ export const downloadAPI = {
     quality?: string;
     language_preference?: string;
     indexer_used?: string;
+    season?: number;
+    episode?: number;
   }) => api.post('/downloads/', {
     ...data,
     media_type: mapMediaType(data.media_type),
