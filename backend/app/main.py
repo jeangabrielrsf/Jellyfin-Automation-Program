@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from app.database import init_db
 from app.logging_config import setup_logging
 from app.routers import search, downloads, settings, logs
+from app.services.download_worker import DownloadWorker
 
 logger = setup_logging()
 
@@ -57,8 +58,22 @@ async def lifespan(app: FastAPI) -> None:
     """Handle application startup and shutdown events."""
     logger.info("Starting up Jellyfin Automation")
     await asyncio.to_thread(init_db)
+    
+    # Start DownloadWorker background task
+    download_worker = DownloadWorker()
+    worker_task = asyncio.create_task(download_worker.start())
+    app.state.download_worker = download_worker
+    app.state.worker_task = worker_task
+    
     yield
+    
+    # Shutdown
     logger.info("Shutting down Jellyfin Automation")
+    worker_task.cancel()
+    try:
+        await worker_task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(
