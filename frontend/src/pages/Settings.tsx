@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Folder, Sparkles, Save } from 'lucide-react';
 import { settingsAPI } from '../services/api';
+import { Button } from '@/components/ui/button';
+import FolderPickerDialog from '@/components/FolderPickerDialog';
+
+const pathKeys = ['movies_path', 'series_path', 'animes_path'];
 
 const settingGroups = [
   {
@@ -27,6 +31,7 @@ const settingGroups = [
 
 const SettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const [pickerOpen, setPickerOpen] = useState<string | null>(null);
 
   const { data: currentSettings, isLoading } = useQuery({
     queryKey: ['settings'],
@@ -136,19 +141,31 @@ const SettingsPage: React.FC = () => {
                         <option value="dublado">Dublado</option>
                       </select>
                     ) : (
-                      <input
-                        type="text"
-                        defaultValue={currentValues[setting.key] || ''}
-                        placeholder={setting.placeholder}
-                        onBlur={(e) => handleUpdate(setting.key, e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl glass bg-transparent
-                                 border border-border/50
-                                 focus:outline-none focus:ring-2 focus:ring-primary/30
-                                 focus:border-primary/30
-                                 text-foreground placeholder:text-muted-foreground/50
-                                 font-mono text-sm
-                                 transition-all duration-200"
-                      />
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          defaultValue={currentValues[setting.key] || ''}
+                          placeholder={setting.placeholder}
+                          onBlur={(e) => handleUpdate(setting.key, e.target.value)}
+                          className="flex-1 px-4 py-3 rounded-xl glass bg-transparent
+                                   border border-border/50
+                                   focus:outline-none focus:ring-2 focus:ring-primary/30
+                                   focus:border-primary/30
+                                   text-foreground placeholder:text-muted-foreground/50
+                                   font-mono text-sm
+                                   transition-all duration-200"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="default"
+                          className="shrink-0"
+                          onClick={() => setPickerOpen(setting.key)}
+                        >
+                          <Folder className="w-4 h-4 mr-1" />
+                          Browse
+                        </Button>
+                      </div>
                     )}
                     {updateMutation.isPending && updateMutation.variables?.key === setting.key && (
                       <Save className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-pulse" />
@@ -160,6 +177,18 @@ const SettingsPage: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {pickerOpen && (
+        <FolderPickerDialog
+          open={!!pickerOpen}
+          onOpenChange={(open) => {
+            if (!open) setPickerOpen(null);
+          }}
+          onSelect={(path) => {
+            handleUpdate(pickerOpen, path);
+          }}
+        />
+      )}
     </div>
   );
 };
