@@ -34,8 +34,10 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 - **DB:** SQLAlchemy 2.0 + PostgreSQL in prod; Alembic migrations in `backend/alembic/`.
 - **Tests:** pytest + pytest-asyncio. `conftest.py` overrides `get_db` with SQLite in-memory (`StaticPool`).
 - **Logging:** Loguru + structlog. Logs written to `backend/logs/app.log` with rotation.
+- **Services:** `PathResolver` (`app/services/path_resolver.py`) computes save paths from torrent metadata; `DownloadWorker` (`app/services/download_worker.py`) monitors qBittorrent progress in a background loop; `OrganizerService` (`app/services/organizer_service.py`) moves completed downloads to library folders.
 - **WebSocket:** `/ws` endpoint in `app/main.py` broadcasts download updates.
 - **Static files:** `main.py` mounts `../frontend/dist` at `/` for production serving; if missing, app starts without it.
+- **Background worker:** `DownloadWorker` is started in the FastAPI lifespan and syncs qBittorrent state every 10 seconds.
 
 ## Frontend architecture
 
@@ -49,16 +51,21 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 
 ## Download flow
 
-1. User searches TMDB → selects media → sees torrent results from Jackett
+1. User searches TMDB → selects media (and season/episode for TV) → sees torrent results from Jackett
 2. Frontend calls `POST /api/downloads/` with:
    - `magnet_link` (optional) — magnet URI if available from indexer
    - `download_url` (optional) — Jackett proxy link for .torrent file
-3. Backend saves to DB with status `PENDING`
-4. Backend immediately tries to add to qBittorrent:
+   - `season` / `episode` (optional) — for series/anime episodes
+3. Backend uses `PathResolver` to compute the save path from title, media type, torrent name, and season/episode
+4. Backend saves to DB with status `PENDING`, including `season`, `episode`, and `source_folder`
+5. Backend immediately tries to add to qBittorrent with the computed `save_path`:
    - If `magnet_link` is present → sends magnet URI directly to qBittorrent
    - If only `download_url` is present → downloads .torrent file from Jackett and uploads to qBittorrent
    - If download fails (e.g., link expired) → attempts to refresh link via Jackett API
-5. On success → status becomes `DOWNLOADING`; on failure → `FAILED` with `error_message`
+6. On success → status becomes `DOWNLOADING`; on failure → `FAILED` with `error_message`
+7. `DownloadWorker` (background task) monitors qBittorrent every 10 seconds:
+   - Updates `progress`, `speed`, `eta`, and `status` in the database
+   - When a download reaches `COMPLETED`, triggers `OrganizerService` to move files to the appropriate library folder (`movies_path`, `series_path`, or `animes_path`)
 
 ## Environment / gotchas
 
@@ -70,6 +77,8 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 - No pre-commit hooks, CI workflows, or formatting automation are configured yet.
 - **Trailing slashes matter:** FastAPI routes are defined with trailing slashes (e.g., `/api/downloads/`). Frontend must use trailing slashes to avoid 307 redirects.
 - **Jackett links expire:** `download_url` from Jackett search results may expire after a few minutes. The backend implements fallback logic to refresh expired links.
+- **DownloadWorker runs on startup:** The background worker starts automatically with the FastAPI app and cannot be disabled without code changes.
+- **OrganizerService moves files on completion:** Completed downloads are automatically organized into `MOVIES_PATH`, `SERIES_PATH`, or `ANIMES_PATH` based on media type. Ensure these paths are writable.
 
 ## Running a single test
 
