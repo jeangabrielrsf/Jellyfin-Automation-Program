@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Optional, List
 from app.config import get_settings
 from app.logging_config import get_logger
+from sqlalchemy.orm import Session
+from app.services.settings_service import get_media_paths
 
 logger = get_logger(__name__)
 
@@ -14,15 +16,24 @@ class OrganizerService:
     VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.m4v'}
     SUBTITLE_EXTENSIONS = {'.srt', '.ass', '.ssa', '.sub', '.idx'}
     
-    def __init__(self):
-        self.settings = get_settings()
+    def __init__(self, db: Optional[Session] = None):
+        if db:
+            paths = get_media_paths(db)
+            self.movies_path = paths["movies_path"]
+            self.series_path = paths["series_path"]
+            self.animes_path = paths["animes_path"]
+        else:
+            settings = get_settings()
+            self.movies_path = settings.movies_path
+            self.series_path = settings.series_path
+            self.animes_path = settings.animes_path
     
     def organize_movie(self, source_path: str, title: str, year: Optional[int], quality: str) -> str:
         """Organize a movie file."""
         source = Path(source_path)
         
         folder_name = f"{title} ({year})" if year else title
-        dest_folder = Path(self.settings.movies_path) / self._sanitize_filename(folder_name)
+        dest_folder = Path(self.movies_path) / self._sanitize_filename(folder_name)
         dest_folder.mkdir(parents=True, exist_ok=True)
         
         video_files = self._get_video_files(source)
@@ -45,7 +56,7 @@ class OrganizerService:
         """Organize a TV episode file."""
         source = Path(source_path)
         
-        show_folder = Path(self.settings.series_path) / self._sanitize_filename(title)
+        show_folder = Path(self.series_path) / self._sanitize_filename(title)
         season_folder = show_folder / f"Season {season:02d}"
         season_folder.mkdir(parents=True, exist_ok=True)
         
@@ -69,7 +80,7 @@ class OrganizerService:
         """Organize an anime episode file."""
         source = Path(source_path)
         
-        show_folder = Path(self.settings.animes_path) / self._sanitize_filename(title)
+        show_folder = Path(self.animes_path) / self._sanitize_filename(title)
         season_folder = show_folder / f"Season {season:02d}"
         season_folder.mkdir(parents=True, exist_ok=True)
         
