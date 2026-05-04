@@ -43,6 +43,22 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 - **Proxy:** Vite dev server proxies `/api` and `/ws` to `localhost:8000`.
 - **Stack:** React Router, TanStack Query, Axios, shadcn/ui components in `src/components/ui/`.
 - **Strict TS:** `noUnusedLocals` and `noUnusedParameters` are enabled.
+- **UI Components:** Uses shadcn/ui components. New components should be added via `npx shadcn@latest add <component>`.
+  - Dialogs/modals must use the `Dialog` component from `@/components/ui/dialog` — no custom modal implementations.
+  - Toast notifications use `sonner` (`toast.success()` / `toast.error()`) — never use native `alert()`.
+
+## Download flow
+
+1. User searches TMDB → selects media → sees torrent results from Jackett
+2. Frontend calls `POST /api/downloads/` with:
+   - `magnet_link` (optional) — magnet URI if available from indexer
+   - `download_url` (optional) — Jackett proxy link for .torrent file
+3. Backend saves to DB with status `PENDING`
+4. Backend immediately tries to add to qBittorrent:
+   - If `magnet_link` is present → sends magnet URI directly to qBittorrent
+   - If only `download_url` is present → downloads .torrent file from Jackett and uploads to qBittorrent
+   - If download fails (e.g., link expired) → attempts to refresh link via Jackett API
+5. On success → status becomes `DOWNLOADING`; on failure → `FAILED` with `error_message`
 
 ## Environment / gotchas
 
@@ -52,6 +68,8 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 - When running backend outside Docker but services on host, use `host.docker.internal` (Docker) or host IP (WSL2 native) for external service URLs.
 - `dist/` is in `.gitignore`; frontend must be built before backend can serve static files.
 - No pre-commit hooks, CI workflows, or formatting automation are configured yet.
+- **Trailing slashes matter:** FastAPI routes are defined with trailing slashes (e.g., `/api/downloads/`). Frontend must use trailing slashes to avoid 307 redirects.
+- **Jackett links expire:** `download_url` from Jackett search results may expire after a few minutes. The backend implements fallback logic to refresh expired links.
 
 ## Running a single test
 
