@@ -113,7 +113,7 @@ class DownloadWorker:
     async def _organize_completed_download(self, download: Download):
         """Organize files when a download completes."""
         try:
-            organizer = OrganizerService()
+            organizer = OrganizerService(db=db)
             
             if download.type.value == "movie":
                 logger.info(
