@@ -77,7 +77,8 @@ async def create_download(
             season=season,
             episode=episode,
             year=download.year,
-            quality=download.quality
+            quality=download.quality,
+            db=db,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
