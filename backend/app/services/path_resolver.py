@@ -11,17 +11,17 @@ logger = get_logger(__name__)
 class PathResolver:
     """Resolve save paths for media downloads."""
     
-    # Patterns to extract season/episode from torrent names
+    # Compiled patterns to extract season/episode from torrent names
     SEASON_EPISODE_PATTERNS = [
-        r'[Ss](\d{1,2})[Ee](\d{1,2})',      # S08E17, s01e05
-        r'(\d{1,2})[xX](\d{1,2})',          # 8x17, 1x05
-        r'[Ss]eason[.\s]*(\d{1,2}).*[Ee]pisode[.\s]*(\d{1,2})',  # Season 8 Episode 17
+        re.compile(r'[Ss](\d{1,2})[Ee](\d{1,2})'),      # S08E17, s01e05
+        re.compile(r'(\d{1,2})[xX](\d{1,2})'),          # 8x17, 1x05
+        re.compile(r'[Ss]eason[.\s]*(\d{1,2}).*[Ee]pisode[.\s]*(\d{1,2})'),  # Season 8 Episode 17
     ]
     
     def extract_season_episode(self, torrent_name: str) -> Dict[str, Optional[int]]:
         """Extract season and episode numbers from torrent name."""
         for pattern in self.SEASON_EPISODE_PATTERNS:
-            match = re.search(pattern, torrent_name)
+            match = pattern.search(torrent_name)
             if match:
                 return {
                     "season": int(match.group(1)),
@@ -98,7 +98,14 @@ class PathResolver:
     
     def _sanitize_filename(self, filename: str) -> str:
         """Remove invalid characters from filename."""
+        # Replace invalid filesystem characters
         invalid_chars = '<>:"/\\|?*'
         for char in invalid_chars:
             filename = filename.replace(char, '_')
-        return filename.strip()
+        # Replace directory traversal sequences
+        filename = filename.replace('..', '_')
+        # Strip control characters
+        filename = ''.join(char for char in filename if ord(char) >= 32)
+        # Trim leading/trailing dots and spaces
+        filename = filename.strip('. ')
+        return filename
