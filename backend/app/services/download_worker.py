@@ -122,7 +122,7 @@ class DownloadWorker:
                     title=download.title,
                     source_folder=download.source_folder
                 )
-            elif download.type.value in ("series", "anime"):
+            elif download.type.value == "series":
                 if download.season and download.episode:
                     organizer.organize_series(
                         source_path=download.source_folder,
@@ -141,6 +141,27 @@ class DownloadWorker:
                 else:
                     logger.warning(
                         "Cannot organize series without season/episode",
+                        download_id=download.id
+                    )
+            elif download.type.value == "anime":
+                if download.season and download.episode:
+                    organizer.organize_anime(
+                        source_path=download.source_folder,
+                        title=download.title,
+                        season=download.season,
+                        episode=download.episode,
+                        quality=download.quality or "1080p"
+                    )
+                    logger.info(
+                        "Organized anime download",
+                        download_id=download.id,
+                        title=download.title,
+                        season=download.season,
+                        episode=download.episode
+                    )
+                else:
+                    logger.warning(
+                        "Cannot organize anime without season/episode",
                         download_id=download.id
                     )
         except Exception as e:
