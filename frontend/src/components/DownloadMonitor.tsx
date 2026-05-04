@@ -1,6 +1,12 @@
-import React from 'react';
-import { Pause, Play, Trash2, Download, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import React, { useState } from 'react';
+import { Pause, Play, Trash2, Download, CheckCircle2, AlertCircle, Clock, Info } from 'lucide-react';
 import { Download as DownloadType } from '../types';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface DownloadMonitorProps {
   downloads: DownloadType[];
@@ -15,7 +21,7 @@ const statusConfig: Record<string, { icon: React.ElementType; color: string; bg:
   failed: { icon: AlertCircle, color: 'text-red-400', bg: 'bg-red-400/10', label: 'Falhou' },
   cancelled: { icon: Trash2, color: 'text-muted-foreground', bg: 'bg-muted', label: 'Cancelado' },
   paused: { icon: Pause, color: 'text-amber-400', bg: 'bg-amber-400/10', label: 'Pausado' },
-  queued: { icon: Clock, color: 'text-purple-400', bg: 'bg-purple-400/10', label: 'Na fila' },
+  pending: { icon: Clock, color: 'text-purple-400', bg: 'bg-purple-400/10', label: 'Na fila' },
 };
 
 export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
@@ -24,6 +30,8 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
   onResume,
   onCancel,
 }) => {
+  const [selectedDownload, setSelectedDownload] = useState<DownloadType | null>(null);
+
   if (downloads.length === 0) {
     return (
       <div className="text-center py-16 text-muted-foreground">
@@ -39,15 +47,18 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
   return (
     <div className="space-y-4">
       {downloads.map((download, index) => {
-        const status = statusConfig[download.status] || statusConfig.queued;
+        const status = statusConfig[download.status] || statusConfig.pending;
         const StatusIcon = status.icon;
         const progress = Math.round(download.progress * 100);
+        const hasDetails = download.status === 'failed' || download.error_message;
 
         return (
           <div
             key={download.id}
-            className="glass rounded-2xl p-5 transition-all duration-300
-                     hover:border-primary/20 hover:-translate-y-0.5"
+            onClick={() => hasDetails && setSelectedDownload(download)}
+            className={`glass rounded-2xl p-5 transition-all duration-300
+                     hover:border-primary/20 hover:-translate-y-0.5
+                     ${hasDetails ? 'cursor-pointer' : ''}`}
             style={{ animationDelay: `${index * 50}ms` }}
           >
             {/* Header */}
@@ -67,6 +78,12 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
                     <span className="text-xs text-muted-foreground font-mono">
                       {download.quality || '1080p'}
                     </span>
+                    {hasDetails && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Info className="w-3 h-3" />
+                        Clique para detalhes
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -75,7 +92,7 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
               <div className="flex items-center gap-2 flex-shrink-0">
                 {download.status === 'downloading' && (
                   <button
-                    onClick={() => onPause(download.id)}
+                    onClick={(e) => { e.stopPropagation(); onPause(download.id); }}
                     className="w-9 h-9 rounded-lg glass flex items-center justify-center
                              hover:bg-amber-400/10 hover:text-amber-400
                              active:scale-95 transition-all duration-200"
@@ -86,7 +103,7 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
                 )}
                 {download.status === 'paused' && (
                   <button
-                    onClick={() => onResume(download.id)}
+                    onClick={(e) => { e.stopPropagation(); onResume(download.id); }}
                     className="w-9 h-9 rounded-lg glass flex items-center justify-center
                              hover:bg-emerald-400/10 hover:text-emerald-400
                              active:scale-95 transition-all duration-200"
@@ -96,7 +113,7 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
                   </button>
                 )}
                 <button
-                  onClick={() => onCancel(download.id)}
+                  onClick={(e) => { e.stopPropagation(); onCancel(download.id); }}
                   className="w-9 h-9 rounded-lg glass flex items-center justify-center
                            hover:bg-red-400/10 hover:text-red-400
                            active:scale-95 transition-all duration-200"
@@ -133,6 +150,65 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
           </div>
         );
       })}
+
+      {/* Detail Dialog */}
+      <Dialog open={!!selectedDownload} onOpenChange={(open) => !open && setSelectedDownload(null)}>
+        <DialogContent className="glass rounded-2xl p-6 max-w-lg w-full space-y-4 border-none">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl font-bold text-foreground">
+              Detalhes do Download
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedDownload && (
+            <div className="space-y-3 text-sm">
+              <div>
+                <span className="text-muted-foreground">Título:</span>
+                <p className="font-semibold text-foreground">{selectedDownload.title}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Torrent:</span>
+                <p className="font-mono text-foreground text-xs break-all">{selectedDownload.torrent_name || '—'}</p>
+              </div>
+              <div className="flex gap-4">
+                <div>
+                  <span className="text-muted-foreground">Status:</span>
+                  <p className="font-semibold text-foreground capitalize">{selectedDownload.status}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Qualidade:</span>
+                  <p className="font-semibold text-foreground">{selectedDownload.quality}</p>
+                </div>
+              </div>
+              {selectedDownload.magnet_link && (
+                <div>
+                  <span className="text-muted-foreground">Link/Magnet:</span>
+                  <p className="font-mono text-foreground text-xs break-all bg-muted/50 rounded-lg p-2 mt-1">
+                    {selectedDownload.magnet_link}
+                  </p>
+                </div>
+              )}
+              {selectedDownload.error_message && (
+                <div className="rounded-xl bg-red-400/10 border border-red-400/20 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="w-4 h-4 text-red-400" />
+                    <span className="font-semibold text-red-400">Erro</span>
+                  </div>
+                  <p className="text-red-300 text-sm whitespace-pre-wrap">
+                    {selectedDownload.error_message}
+                  </p>
+                </div>
+              )}
+              <div>
+                <span className="text-muted-foreground">Criado em:</span>
+                <p className="text-foreground">
+                  {new Date(selectedDownload.created_at).toLocaleString('pt-BR')}
+                </p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
