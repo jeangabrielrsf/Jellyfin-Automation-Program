@@ -2,8 +2,10 @@
 import re
 from typing import Optional, Dict
 from pathlib import Path
+from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.logging_config import get_logger
+from app.services.settings_service import get_media_paths
 
 logger = get_logger(__name__)
 
@@ -37,7 +39,8 @@ class PathResolver:
         season: Optional[int] = None,
         episode: Optional[int] = None,
         year: Optional[int] = None,
-        quality: Optional[str] = None
+        quality: Optional[str] = None,
+        db: Optional[Session] = None
     ) -> str:
         """Resolve the save path for a download.
         
@@ -53,7 +56,16 @@ class PathResolver:
         Returns:
             Absolute path where the torrent should be saved
         """
-        settings = get_settings()
+        if db:
+            paths = get_media_paths(db)
+            movies_path = paths["movies_path"]
+            series_path = paths["series_path"]
+            animes_path = paths["animes_path"]
+        else:
+            settings = get_settings()
+            movies_path = settings.movies_path
+            series_path = settings.series_path
+            animes_path = settings.animes_path
         
         # Extract season/episode from torrent name if not provided
         if media_type in ("series", "anime") and season is None and torrent_name:
@@ -69,14 +81,14 @@ class PathResolver:
         # Build path based on media type
         if media_type == "movie":
             folder_name = f"{title} ({year})" if year else title
-            base_path = Path(settings.movies_path)
+            base_path = Path(movies_path)
             save_path = base_path / self._sanitize_filename(folder_name)
         elif media_type == "series":
-            base_path = Path(settings.series_path)
+            base_path = Path(series_path)
             show_folder = base_path / self._sanitize_filename(title)
             save_path = show_folder / f"Season {season:02d}"
         elif media_type == "anime":
-            base_path = Path(settings.animes_path)
+            base_path = Path(animes_path)
             show_folder = base_path / self._sanitize_filename(title)
             save_path = show_folder / f"Season {season:02d}"
         else:
