@@ -85,34 +85,46 @@ async def search_torrents(
     season: Optional[int] = Query(None, ge=1),
     episode: Optional[int] = Query(None, ge=1),
     quality: Optional[str] = Query("1080p"),
-    language: Optional[str] = Query("legendado")
+    language: Optional[str] = Query("legendado"),
+    query: Optional[str] = Query(None, description="Custom search query override")
 ):
-    """Search for torrents for a specific media using TMDB titles."""
+    """Search for torrents for a specific media using TMDB titles or a custom query."""
     service = TMDBService()
     scraper = JackettScraper()
     try:
-        # Fetch detail to get both Portuguese and original titles
-        if media_type == "movie":
-            detail = await service.get_movie_detail(tmdb_id)
-            pt_title = detail.title or detail.original_title or ""
-            original_title = detail.original_title or detail.title or ""
+        if query and query.strip():
+            # Custom query provided — use it directly (season/episode suffix still applies)
+            suffix = ""
+            if season is not None and episode is not None:
+                suffix = f" S{season:02d}E{episode:02d}"
+            elif season is not None:
+                suffix = f" S{season:02d}"
+
+            queries = [query.strip() + suffix]
         else:
-            detail = await service.get_tv_detail(tmdb_id)
-            pt_title = detail.name or detail.original_name or ""
-            original_title = detail.original_name or detail.name or ""
+            # Fetch detail to get both original and localized titles
+            if media_type == "movie":
+                detail = await service.get_movie_detail(tmdb_id)
+                original_title = detail.original_title or detail.title or ""
+                localized_title = detail.title or detail.original_title or ""
+            else:
+                detail = await service.get_tv_detail(tmdb_id)
+                original_title = detail.original_name or detail.name or ""
+                localized_title = detail.name or detail.original_name or ""
 
-        # Build suffix for season/episode refinement
-        suffix = ""
-        if season is not None and episode is not None:
-            suffix = f" S{season:02d}E{episode:02d}"
-        elif season is not None:
-            suffix = f" S{season:02d}"
+            # Build suffix for season/episode refinement
+            suffix = ""
+            if season is not None and episode is not None:
+                suffix = f" S{season:02d}E{episode:02d}"
+            elif season is not None:
+                suffix = f" S{season:02d}"
 
-        queries = []
-        if pt_title:
-            queries.append(pt_title + suffix)
-        if original_title and original_title != pt_title:
-            queries.append(original_title + suffix)
+            # Original title first for better torrent matching
+            queries = []
+            if original_title:
+                queries.append(original_title + suffix)
+            if localized_title and localized_title != original_title:
+                queries.append(localized_title + suffix)
 
         if not queries:
             return []
