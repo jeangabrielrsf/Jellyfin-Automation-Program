@@ -6,13 +6,16 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface DownloadMonitorProps {
   downloads: DownloadType[];
   onPause: (id: number) => void;
   onResume: (id: number) => void;
   onCancel: (id: number) => void;
+  onClear: () => void;
 }
 
 const statusConfig: Record<string, { icon: React.ElementType; color: string; bg: string; label: string }> = {
@@ -29,8 +32,14 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
   onPause,
   onResume,
   onCancel,
+  onClear,
 }) => {
   const [selectedDownload, setSelectedDownload] = useState<DownloadType | null>(null);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+
+  const clearableCount = downloads.filter(
+    (d) => d.status !== 'pending' && d.status !== 'downloading'
+  ).length;
 
   if (downloads.length === 0) {
     return (
@@ -46,6 +55,19 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
 
   return (
     <div className="space-y-4">
+      {clearableCount > 0 && (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setClearDialogOpen(true)}
+            className="text-muted-foreground hover:text-red-400 hover:border-red-400/30"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Limpar todos ({clearableCount})
+          </Button>
+        </div>
+      )}
       {downloads.map((download, index) => {
         const status = statusConfig[download.status] || statusConfig.pending;
         const StatusIcon = status.icon;
@@ -150,6 +172,38 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
           </div>
         );
       })}
+
+      {/* Clear confirmation Dialog */}
+      <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+        <DialogContent className="glass rounded-2xl p-6 max-w-md w-full space-y-4 border-none">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl font-bold text-foreground">
+              Limpar downloads
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground text-sm">
+            Isso removerá {clearableCount} download{clearableCount !== 1 ? 's' : ''} concluído{clearableCount !== 1 ? 's' : ''}, falho{clearableCount !== 1 ? 's' : ''} ou cancelado{clearableCount !== 1 ? 's' : ''} do banco de dados.
+            Downloads ativos não serão afetados.
+          </p>
+          <p className="text-muted-foreground text-xs">
+            Os arquivos baixados serão mantidos no disco.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setClearDialogOpen(false);
+                onClear();
+              }}
+            >
+              Limpar {clearableCount} download{clearableCount !== 1 ? 's' : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Detail Dialog */}
       <Dialog open={!!selectedDownload} onOpenChange={(open) => !open && setSelectedDownload(null)}>
