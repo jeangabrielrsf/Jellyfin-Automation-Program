@@ -257,6 +257,58 @@ class TestDownloadsRouter:
         response = client.get("/api/downloads/9999")
         assert response.status_code == 404
 
+    def test_clear_all_downloads(self, client, db_session):
+        """Test clearing all completed/failed downloads, skipping active."""
+        # Add a completed download
+        completed = Download(
+            tmdb_id=1,
+            title="Completed Movie",
+            type=ContentType.MOVIE,
+            torrent_name="Test Movie 1080p",
+            torrent_hash="abc123abc123abc123abc123abc123abc123abc1",
+            status=DownloadStatus.COMPLETED,
+        )
+        # Add a failed download
+        failed = Download(
+            tmdb_id=2,
+            title="Failed Movie",
+            type=ContentType.MOVIE,
+            torrent_name="Bad Movie",
+            status=DownloadStatus.FAILED,
+            error_message="Something went wrong",
+        )
+        # Add an active download (should be skipped)
+        active = Download(
+            tmdb_id=3,
+            title="Active Movie",
+            type=ContentType.MOVIE,
+            torrent_name="Downloading Movie",
+            torrent_hash="def456def456def456def456def456def456def4",
+            status=DownloadStatus.DOWNLOADING,
+        )
+        db_session.add_all([completed, failed, active])
+        db_session.commit()
+
+        with patch('app.routers.downloads.QBittorrentService') as mock_service_class:
+            mock_instance = mock_service_class.return_value
+            mock_instance.delete_torrent = AsyncMock(return_value=True)
+            mock_instance.close = AsyncMock()
+            response = client.delete("/api/downloads/")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["deleted"] == 2
+        assert data["skipped"] == 1
+
+        # Verify only active remains
+        remaining = db_session.query(Download).all()
+        assert len(remaining) == 1
+        assert remaining[0].status == DownloadStatus.DOWNLOADING
+
+        # Verify qBittorrent delete_torrent was called for completed (not failed, no hash)
+        mock_instance.delete_torrent.assert_awaited_once_with("abc123abc123abc123abc123abc123abc123abc1", delete_files=False)
+        mock_instance.close.assert_awaited_once()
+
 
 class TestSettingsRouter:
     """Tests for settings endpoints."""

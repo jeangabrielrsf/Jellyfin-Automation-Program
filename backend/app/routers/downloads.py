@@ -227,3 +227,42 @@ async def resume_download(download_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Failed to resume torrent in qBittorrent")
     
     return {"message": "Download resumed"}
+
+@router.delete("/")
+async def delete_all_downloads(db: Session = Depends(get_db)):
+    """Delete all completed, failed, and cancelled downloads. Skips active downloads.
+    Removes torrents from qBittorrent but keeps files on disk."""
+    
+    # Count active downloads that will be skipped
+    active_count = db.query(Download).filter(
+        Download.status.in_([DownloadStatus.PENDING, DownloadStatus.DOWNLOADING])
+    ).count()
+    
+    # Get all removable downloads
+    removable = db.query(Download).filter(
+        Download.status.not_in([DownloadStatus.PENDING, DownloadStatus.DOWNLOADING])
+    ).all()
+    
+    # Remove torrents from qBittorrent (keep files)
+    service = QBittorrentService()
+    for download in removable:
+        if download.torrent_hash:
+            try:
+                await service.delete_torrent(download.torrent_hash, delete_files=False)
+            except Exception:
+                logger.warning(
+                    "Failed to remove torrent from qBittorrent",
+                    download_id=download.id,
+                    torrent_hash=download.torrent_hash,
+                )
+    await service.close()
+    
+    # Delete all removable records in a single query
+    deleted_count = db.query(Download).filter(
+        Download.status.not_in([DownloadStatus.PENDING, DownloadStatus.DOWNLOADING])
+    ).delete(synchronize_session=False)
+    
+    db.commit()
+    
+    logger.info("Cleared downloads", deleted=deleted_count, skipped=active_count)
+    return {"deleted": deleted_count, "skipped": active_count}
