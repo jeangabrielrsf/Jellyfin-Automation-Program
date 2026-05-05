@@ -44,8 +44,11 @@ class Download(Base):
     destination_folder = Column(Text)
     
     indexer_used = Column(String(100))
+    size = Column(String(50))
+    seeds = Column(Integer)
+    peers = Column(Integer)
     error_message = Column(Text)
-    
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     completed_at = Column(DateTime(timezone=True))

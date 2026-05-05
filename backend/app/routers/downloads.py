@@ -24,6 +24,9 @@ class DownloadCreate(BaseModel):
     quality: str = "1080p"
     language_preference: str = "legendado"
     indexer_used: Optional[str] = None
+    size: Optional[str] = None
+    seeds: Optional[int] = None
+    peers: Optional[int] = None
     season: Optional[int] = None
     episode: Optional[int] = None
     year: Optional[int] = None
@@ -96,6 +99,9 @@ async def create_download(
         language_preference=download.language_preference,
         status=DownloadStatus.PENDING,
         indexer_used=download.indexer_used,
+        size=download.size,
+        seeds=download.seeds,
+        peers=download.peers,
         season=season,
         episode=episode,
         source_folder=save_path
