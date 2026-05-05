@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000, 30000];
 const PING_INTERVAL = 30000;
@@ -14,7 +14,13 @@ let globalReadyState: number = WebSocket.CLOSED;
 let globalLastMessage: any = null;
 
 function notifyListeners() {
-  listeners.forEach((fn) => fn(globalLastMessage));
+  listeners.forEach((fn) => {
+    try {
+      fn(globalLastMessage);
+    } catch {
+      // Prevent one listener error from breaking others
+    }
+  });
 }
 
 function scheduleReconnect() {
@@ -77,7 +83,7 @@ function connect() {
   };
 
   ws.onerror = () => {
-    // onclose will be called after this
+    console.error('WebSocket connection error');
   };
 }
 
@@ -105,15 +111,14 @@ function teardownConnection() {
 export function useWebSocket() {
   const [lastMessage, setLastMessage] = useState<any>(globalLastMessage);
   const [readyState, setReadyState] = useState<number>(globalReadyState);
-  const listenerRef = useRef<Listener | null>(null);
 
   useEffect(() => {
-    const listener = (message: any) => {
+    const listener: Listener = (message) => {
       setLastMessage(message);
+      setReadyState(globalReadyState);
     };
-    listenerRef.current = listener;
-    listeners.add(listener);
 
+    listeners.add(listener);
     setReadyState(globalReadyState);
 
     if (listeners.size === 1) {
@@ -122,29 +127,11 @@ export function useWebSocket() {
 
     return () => {
       listeners.delete(listener);
-      listenerRef.current = null;
       if (listeners.size === 0) {
         teardownConnection();
       }
     };
   }, []);
-
-  useEffect(() => {
-    const sync = () => {
-      setReadyState(globalReadyState);
-    };
-    const originalListener = listenerRef.current;
-    if (originalListener) {
-      listeners.delete(originalListener as any);
-    }
-    const newListener = (message: any) => {
-      setLastMessage(message);
-      setReadyState(globalReadyState);
-    };
-    listenerRef.current = newListener;
-    listeners.add(newListener);
-    listeners.delete(sync as any);
-  });
 
   const sendMessage = useCallback((data: any) => {
     if (ws?.readyState === WebSocket.OPEN) {
