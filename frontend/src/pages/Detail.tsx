@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Download, Play, Info, Search, SearchCheck } from 'lucide-react';
@@ -20,6 +20,8 @@ const DetailPage: React.FC = () => {
 
   const isTV = mediaType === 'tv';
 
+  const [effectiveMediaType, setEffectiveMediaType] = useState(mediaType || 'movie');
+
   const { data: detail, isLoading: detailLoading } = useQuery({
     queryKey: ['detail', mediaType, tmdbId],
     queryFn: () =>
@@ -28,6 +30,17 @@ const DetailPage: React.FC = () => {
         : searchAPI.getTVDetail(tmdbId),
     enabled: !!tmdbId && !!mediaType,
   });
+
+  const media = detail?.data;
+
+  useEffect(() => {
+    if (media?.genres) {
+      const hasAnimation = media.genres.some(
+        (g: { name?: string }) => g.name?.toLowerCase() === 'animation'
+      );
+      setEffectiveMediaType(isTV && hasAnimation ? 'anime' : (mediaType || 'movie'));
+    }
+  }, [media, mediaType, isTV]);
 
   const { data: seasonsData } = useQuery({
     queryKey: ['seasons', tmdbId],
@@ -40,7 +53,7 @@ const DetailPage: React.FC = () => {
     queryFn: () =>
       searchAPI.searchTorrents({
         tmdb_id: tmdbId,
-        media_type: mediaType || 'movie',
+        media_type: effectiveMediaType || 'movie',
         season: selectedSeason ? Number(selectedSeason) : undefined,
         episode: selectedEpisode !== 'temporada-inteira' ? Number(selectedEpisode) : undefined,
         query: customSearchEnabled && customQuery.trim() ? customQuery.trim() : undefined,
@@ -58,7 +71,7 @@ const DetailPage: React.FC = () => {
       await downloadAPI.createDownload({
         tmdb_id: tmdbId,
         title: detail?.data?.display_title || '',
-        media_type: mediaType || 'movie',
+        media_type: effectiveMediaType || 'movie',
         torrent_name: torrent.title,
         magnet_link: torrent.magnet_url || undefined,
         download_url: torrent.download_url || undefined,
@@ -75,7 +88,6 @@ const DetailPage: React.FC = () => {
     }
   };
 
-  const media = detail?.data;
   const seasons = seasonsData?.data || [];
 
   const tmdbSearchTerm = useMemo(() => {
@@ -254,6 +266,32 @@ const DetailPage: React.FC = () => {
               >
                 Buscar Torrents
               </button>
+
+              <div className="flex items-center gap-3 pt-2 border-t border-border/30">
+                <label className="text-sm text-muted-foreground">Tipo de conteúdo:</label>
+                <div className="flex rounded-xl border border-border/50 overflow-hidden">
+                  <button
+                    onClick={() => setEffectiveMediaType('series')}
+                    className={`px-4 py-1.5 text-sm transition-colors ${
+                      effectiveMediaType === 'series'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Série
+                  </button>
+                  <button
+                    onClick={() => setEffectiveMediaType('anime')}
+                    className={`px-4 py-1.5 text-sm transition-colors ${
+                      effectiveMediaType === 'anime'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Anime
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

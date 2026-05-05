@@ -2,13 +2,13 @@ import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DownloadMonitor } from '../components/DownloadMonitor';
 import { downloadAPI } from '../services/api';
+import { DownloadUpdates } from '../hooks/useDownloadUpdates';
 
 const DownloadsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: downloads, isLoading } = useQuery({
     queryKey: ['downloads'],
     queryFn: () => downloadAPI.listDownloads(),
-    refetchInterval: 5000,
   });
 
   const pauseMutation = useMutation({
@@ -54,6 +54,7 @@ const DownloadsPage: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      <DownloadUpdates />
       <div className="text-center space-y-4">
         <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">
           Downloads

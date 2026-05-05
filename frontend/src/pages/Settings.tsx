@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Folder, Sparkles, Save } from 'lucide-react';
 import { settingsAPI } from '../services/api';
@@ -30,11 +30,25 @@ const settingGroups = [
 const SettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [pickerOpen, setPickerOpen] = useState<string | null>(null);
+  const [pathValues, setPathValues] = useState<Record<string, string>>({});
 
   const { data: currentSettings, isLoading } = useQuery({
     queryKey: ['settings'],
     queryFn: () => settingsAPI.getSettings(),
   });
+
+  const currentValues = currentSettings?.data || {};
+
+  useEffect(() => {
+    if (currentSettings?.data) {
+      setPathValues((prev) => ({
+        ...prev,
+        movies_path: currentSettings.data.movies_path || '',
+        series_path: currentSettings.data.series_path || '',
+        animes_path: currentSettings.data.animes_path || '',
+      }));
+    }
+  }, [currentSettings?.data?.movies_path, currentSettings?.data?.series_path, currentSettings?.data?.animes_path]);
 
   const updateMutation = useMutation({
     mutationFn: ({ key, value }: { key: string; value: string }) =>
@@ -45,9 +59,13 @@ const SettingsPage: React.FC = () => {
   });
 
   const handleUpdate = (key: string, value: string) => {
-    if (value) {
-      updateMutation.mutate({ key, value });
+    if (!value) return;
+
+    // Update local state immediately for path inputs
+    if (key in pathValues || key.endsWith('_path')) {
+      setPathValues((prev) => ({ ...prev, [key]: value }));
     }
+    updateMutation.mutate({ key, value });
   };
 
   if (isLoading) {
@@ -66,8 +84,6 @@ const SettingsPage: React.FC = () => {
       </div>
     );
   }
-
-  const currentValues = currentSettings?.data || {};
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -142,8 +158,9 @@ const SettingsPage: React.FC = () => {
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          defaultValue={currentValues[setting.key] || ''}
+                          value={pathValues[setting.key] ?? currentValues[setting.key] ?? ''}
                           placeholder={setting.placeholder}
+                          onChange={(e) => setPathValues((prev) => ({ ...prev, [setting.key]: e.target.value }))}
                           onBlur={(e) => handleUpdate(setting.key, e.target.value)}
                           className="flex-1 px-4 py-3 rounded-xl glass bg-transparent
                                    border border-border/50
