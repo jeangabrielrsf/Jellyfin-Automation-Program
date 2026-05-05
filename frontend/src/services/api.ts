@@ -75,6 +75,9 @@ export const downloadAPI = {
 
   resumeDownload: (id: number) =>
     api.post(`/downloads/${id}/resume`),
+
+  clearDownloads: () =>
+    api.delete('/downloads/'),
 };
 
 export const settingsAPI = {
