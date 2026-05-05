@@ -31,9 +31,9 @@ services:
       QBITTORRENT_PASSWORD: ${QBITTORRENT_PASSWORD:-VamosCodar!96}
       JELLYFIN_URL: ${JELLYFIN_URL:-http://jellyfin:8096}
       JELLYFIN_API_KEY: ${JELLYFIN_API_KEY:-}
-      MOVIES_PATH: /movies
-      SERIES_PATH: /series
-      ANIMES_PATH: /animes
+      MOVIES_PATH: ${MOVIES_PATH:-/mnt/d/Filmes}
+      SERIES_PATH: ${SERIES_PATH:-/mnt/d/Séries}
+      ANIMES_PATH: ${ANIMES_PATH:-/mnt/d/Animes}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "8000:8000"
@@ -41,9 +41,8 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ${MOVIES_PATH:-./media/movies}:/movies
-      - ${SERIES_PATH:-./media/series}:/series
-      - ${ANIMES_PATH:-./media/animes}:/animes
+      # Mount Windows drives so the container can browse and write to Windows paths
+      - /mnt:/mnt
       - ./backend/logs:/app/logs
 
   frontend:

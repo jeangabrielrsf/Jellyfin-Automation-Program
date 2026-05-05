@@ -79,17 +79,20 @@ class QBittorrentService:
                 try:
                     torrent_response = await self.client.get(link, follow_redirects=True, timeout=60.0)
                     torrent_response.raise_for_status()
-                    logger.info("Downloaded .torrent file", size=len(torrent_response.content), content_type=torrent_response.headers.get('content-type'))
+                    torrent_response_content = torrent_response.content
+                    logger.info("Downloaded .torrent file", size=len(torrent_response_content), content_type=torrent_response.headers.get('content-type'))
                 except httpx.HTTPError as e:
                     logger.error("Failed to download .torrent file", error=str(e), url=link[:100])
-                    # If download failed and we have a download_url from Jackett, try to get a fresh link
-                    if download_url and "jackett" in download_url.lower():
+                    # If download failed, try to get a fresh link from Jackett
+                    if download_url:
                         logger.info("Attempting to get fresh download link from Jackett")
-                        fresh_link = await self._get_fresh_jackett_link(download_url, torrent_name)
-                        if fresh_link:
-                            logger.info("Got fresh link from Jackett", url=fresh_link[:100])
+                        fresh_result = await self._get_fresh_jackett_link(download_url, torrent_name)
+                        if fresh_result:
+                            fresh_link = fresh_result.get("link")
+                            fresh_tracker = fresh_result.get("tracker_id")
+                            logger.info("Got fresh link from Jackett", url=fresh_link[:100] if fresh_link else None, tracker_id=fresh_tracker)
                             # Check if the fresh link is a magnet link
-                            if fresh_link.strip().startswith("magnet:"):
+                            if fresh_link and fresh_link.strip().startswith("magnet:"):
                                 logger.info("Fresh link is a magnet link, sending directly to qBittorrent")
                                 data["urls"] = fresh_link
                                 response = await self.client.post(add_url, data=data)
@@ -98,19 +101,31 @@ class QBittorrentService:
                                 logger.info("Torrent added to qBittorrent successfully (fresh magnet)", link=fresh_link[:50])
                                 return True
                             else:
-                                try:
-                                    torrent_response = await self.client.get(fresh_link, follow_redirects=True, timeout=60.0)
-                                    torrent_response.raise_for_status()
-                                    logger.info("Downloaded .torrent file with fresh link", size=len(torrent_response.content), content_type=torrent_response.headers.get('content-type'))
-                                except httpx.HTTPError as fresh_error:
-                                    logger.error("Failed to download with fresh link", error=str(fresh_error), url=fresh_link[:100])
-                                    raise
+                                # Try to download via Jackett proxy first, then direct link as fallback
+                                torrent_content = await self._download_torrent_via_jackett(
+                                    fresh_link, fresh_tracker, torrent_name
+                                )
+                                if torrent_content:
+                                    torrent_response_content = torrent_content
+                                    logger.info("Downloaded .torrent via Jackett proxy", size=len(torrent_content))
+                                elif fresh_link:
+                                    try:
+                                        torrent_response = await self.client.get(fresh_link, follow_redirects=True, timeout=60.0)
+                                        torrent_response.raise_for_status()
+                                        torrent_response_content = torrent_response.content
+                                        logger.info("Downloaded .torrent file with fresh link", size=len(torrent_response_content))
+                                    except httpx.HTTPError as fresh_error:
+                                        logger.error("Failed to download with fresh link", error=str(fresh_error), url=fresh_link[:100])
+                                        raise
+                                else:
+                                    logger.error("No fresh link available")
+                                    raise Exception("Could not get fresh download link from Jackett")
                         else:
                             raise
                     else:
                         raise
                 
-                files = {"torrents": ("torrent.torrent", torrent_response.content, "application/x-bittorrent")}
+                files = {"torrents": ("torrent.torrent", torrent_response_content, "application/x-bittorrent")}
                 
                 logger.info("Uploading .torrent file to qBittorrent", url=add_url)
                 response = await self.client.post(
@@ -132,7 +147,37 @@ class QBittorrentService:
             logger.error("Unexpected error adding torrent", error=str(e), error_type=type(e).__name__, is_magnet=is_magnet)
             return False
     
-    async def _get_fresh_jackett_link(self, old_link: str, torrent_name: Optional[str] = None) -> Optional[str]:
+    async def _download_torrent_via_jackett(self, torrent_link: str, tracker_id: str, torrent_name: Optional[str] = None) -> Optional[bytes]:
+        """Download .torrent file through Jackett's proxy download, falling back to direct download."""
+        try:
+            if not tracker_id:
+                return None
+            
+            # Jackett proxy download URL format
+            proxy_url = f"{self.settings.jackett_url}/dl/{tracker_id}"
+            params = {"path": torrent_link}
+            if torrent_name:
+                params["file"] = torrent_name
+            
+            logger.info("Downloading .torrent via Jackett proxy", proxy_url=proxy_url, path=torrent_link[:100])
+            response = await self.client.get(proxy_url, params=params, follow_redirects=True, timeout=60.0)
+            response.raise_for_status()
+            
+            content_type = response.headers.get('content-type', '')
+            if 'text/html' in content_type or response.status_code != 200:
+                logger.warning("Jackett proxy returned non-torrent content", content_type=content_type)
+                return None
+            
+            logger.info("Downloaded .torrent via Jackett proxy successfully", size=len(response.content))
+            return response.content
+        except httpx.HTTPError as e:
+            logger.error("Jackett proxy download failed", error=str(e))
+            return None
+        except Exception as e:
+            logger.error("Unexpected error in Jackett proxy download", error=str(e))
+            return None
+    
+    async def _get_fresh_jackett_link(self, old_link: str, torrent_name: Optional[str] = None) -> Optional[dict]:
         """Try to get a fresh download link from Jackett by searching again."""
         try:
             if not torrent_name:
@@ -174,7 +219,7 @@ class QBittorrentService:
                     magnet_uri = item.get("MagnetUri")
                     if magnet_uri:
                         logger.info("Found fresh magnet link for torrent (exact match)", torrent_name=torrent_name, matched_title=title)
-                        return magnet_uri
+                        return {"link": magnet_uri, "tracker_id": None}
             
             # Pass 1: Word match with MagnetUri
             for item in results:
@@ -185,7 +230,7 @@ class QBittorrentService:
                     magnet_uri = item.get("MagnetUri")
                     if magnet_uri:
                         logger.info("Found fresh magnet link for torrent (word match)", torrent_name=torrent_name, matched_title=title)
-                        return magnet_uri
+                        return {"link": magnet_uri, "tracker_id": None}
             
             # Pass 1: Substring match with MagnetUri
             for item in results:
@@ -195,7 +240,7 @@ class QBittorrentService:
                     magnet_uri = item.get("MagnetUri")
                     if magnet_uri:
                         logger.info("Found fresh magnet link for torrent (substring match)", torrent_name=torrent_name, matched_title=title)
-                        return magnet_uri
+                        return {"link": magnet_uri, "tracker_id": None}
             
             # Pass 2: Exact match with Link (fallback)
             for item in results:
@@ -204,8 +249,9 @@ class QBittorrentService:
                 if normalized_title == normalized_torrent_name:
                     fresh_link = item.get("Link")
                     if fresh_link:
+                        tracker_id = item.get("TrackerId") or item.get("Tracker")
                         logger.info("Found fresh download link for torrent (exact match)", torrent_name=torrent_name, matched_title=title)
-                        return fresh_link
+                        return {"link": fresh_link, "tracker_id": tracker_id}
             
             # Pass 2: Word match with Link (fallback)
             for item in results:
@@ -215,8 +261,9 @@ class QBittorrentService:
                 if torrent_words.issubset(title_words):
                     fresh_link = item.get("Link")
                     if fresh_link:
+                        tracker_id = item.get("TrackerId") or item.get("Tracker")
                         logger.info("Found fresh download link for torrent (word match)", torrent_name=torrent_name, matched_title=title)
-                        return fresh_link
+                        return {"link": fresh_link, "tracker_id": tracker_id}
             
             # Pass 2: Substring match with Link (fallback)
             for item in results:
@@ -225,8 +272,9 @@ class QBittorrentService:
                 if normalized_torrent_name in normalized_title or normalized_title in normalized_torrent_name:
                     fresh_link = item.get("Link")
                     if fresh_link:
+                        tracker_id = item.get("TrackerId") or item.get("Tracker")
                         logger.info("Found fresh download link for torrent (substring match)", torrent_name=torrent_name, matched_title=title)
-                        return fresh_link
+                        return {"link": fresh_link, "tracker_id": tracker_id}
             
             logger.warning("Could not find fresh link for torrent", torrent_name=torrent_name, results_count=len(results))
             return None

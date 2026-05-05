@@ -19,7 +19,7 @@ def temp_dir():
 
 def test_get_root_not_wsl2(client):
     """Test /api/filesystem/root returns / when not in WSL2."""
-    with patch("app.routers.filesystem._is_wsl2", return_value=False):
+    with patch("app.routers.filesystem.is_wsl2", return_value=False):
         response = client.get("/api/filesystem/root")
     assert response.status_code == 200
     data = response.json()
@@ -28,7 +28,7 @@ def test_get_root_not_wsl2(client):
 
 def test_get_root_wsl2(client):
     """Test /api/filesystem/root returns /mnt/ on WSL2."""
-    with patch("app.routers.filesystem._is_wsl2", return_value=True):
+    with patch("app.routers.filesystem.is_wsl2", return_value=True):
         response = client.get("/api/filesystem/root")
     assert response.status_code == 200
     data = response.json()

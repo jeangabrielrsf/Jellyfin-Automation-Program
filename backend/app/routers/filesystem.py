@@ -1,28 +1,17 @@
 """Filesystem browser router — list directories on the server."""
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
+from app.services.path_converter import is_wsl2
+from app.logging_config import get_logger
 
 router = APIRouter(prefix="/api/filesystem", tags=["filesystem"])
-
-
-def _is_wsl2() -> bool:
-    """Check if running under WSL2 by looking for /mnt/ mounted drives."""
-    mnt = Path("/mnt")
-    if not mnt.exists() or not mnt.is_dir():
-        return False
-    try:
-        for entry in mnt.iterdir():
-            if entry.is_dir():
-                return True
-    except PermissionError:
-        pass
-    return False
+logger = get_logger(__name__)
 
 
 @router.get("/root")
 def get_root():
     """Return the root directory for browsing."""
-    if _is_wsl2():
+    if is_wsl2():
         return {"root": "/mnt/"}
     return {"root": "/"}
 
@@ -42,8 +31,10 @@ def list_dirs(path: str = Query("/")):
         for entry in sorted(target.iterdir()):
             if entry.is_dir() and not entry.name.startswith("."):
                 dirs.append(entry.name)
-    except PermissionError:
-        pass
+    except PermissionError as e:
+        logger.warning("Permission error listing directory", path=str(target), error=str(e))
+    except OSError as e:
+        logger.warning("OS error listing directory", path=str(target), error=str(e))
 
     parent = str(target.parent)
     if parent == str(target):

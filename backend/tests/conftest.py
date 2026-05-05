@@ -1,11 +1,19 @@
 """Shared test fixtures."""
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+# Patch loguru file sink before importing app (avoids PermissionError on root-owned logs)
+import loguru
+_original_add = loguru.logger.add
+loguru.logger.add = lambda *a, **kw: 0
+
 from app.database import Base, get_db
 from app.main import app
+
+# Restore original logger.add
+loguru.logger.add = _original_add
 
 
 @pytest.fixture

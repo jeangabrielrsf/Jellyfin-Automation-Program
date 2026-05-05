@@ -111,6 +111,9 @@ async def search_torrents(
                 detail = await service.get_tv_detail(tmdb_id)
                 original_title = detail.original_name or detail.name or ""
                 localized_title = detail.name or detail.original_name or ""
+                # Auto-detect anime from TMDB genres
+                if detail.is_animation:
+                    media_type = "anime"
 
             # Build suffix for season/episode refinement
             suffix = ""

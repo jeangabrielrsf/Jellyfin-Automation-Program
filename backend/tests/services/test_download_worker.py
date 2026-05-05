@@ -63,7 +63,7 @@ async def test_organize_completed_download_anime():
         mock_organizer = MagicMock()
         mock_organizer_cls.return_value = mock_organizer
         
-        await worker._organize_completed_download(mock_download)
+        await worker._organize_completed_download(mock_download, mock_db)
         
         mock_organizer.organize_anime.assert_called_once_with(
             source_path="/downloads/test-anime",
@@ -92,7 +92,7 @@ async def test_organize_completed_download_series():
         mock_organizer = MagicMock()
         mock_organizer_cls.return_value = mock_organizer
         
-        await worker._organize_completed_download(mock_download)
+        await worker._organize_completed_download(mock_download, MagicMock())
         
         mock_organizer.organize_series.assert_called_once_with(
             source_path="/downloads/test-series",

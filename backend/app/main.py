@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI) -> None:
     await asyncio.to_thread(init_db)
     
     # Start DownloadWorker background task
-    download_worker = DownloadWorker()
+    download_worker = DownloadWorker(broadcast_callback=manager.broadcast)
     worker_task = asyncio.create_task(download_worker.start())
     app.state.download_worker = download_worker
     app.state.worker_task = worker_task

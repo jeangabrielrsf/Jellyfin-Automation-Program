@@ -7,6 +7,7 @@ from app.database import get_db
 from app.models.download import Download, DownloadStatus, ContentType
 from app.services.qbittorrent_service import QBittorrentService
 from app.services.path_resolver import PathResolver
+from app.services.path_converter import is_wsl2, wsl_to_windows
 from app.logging_config import get_logger
 from pydantic import BaseModel
 
@@ -107,6 +108,14 @@ async def create_download(
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error")
     
+    # Convert save_path for qBittorrent if running in WSL2
+    # WSL2 paths (/mnt/d/...) need to be converted to Windows format (D:\...) for qBittorrent on Windows
+    qb_save_path = save_path
+    if is_wsl2():
+        qb_save_path = wsl_to_windows(save_path)
+        if qb_save_path != save_path:
+            logger.info("Converted save path for qBittorrent", original=save_path, converted=qb_save_path)
+
     # Try to add torrent to qBittorrent immediately
     logger.info("Creating download", magnet_link=magnet_link, download_url=download_url, torrent_name=download.torrent_name)
     service = QBittorrentService()
@@ -116,7 +125,7 @@ async def create_download(
             download_url=download_url,
             category=download.media_type.value,
             torrent_name=download.torrent_name,
-            save_path=save_path
+            save_path=qb_save_path
         )
         if success:
             # Try to extract hash from magnet link
@@ -125,7 +134,14 @@ async def create_download(
             if torrent_hash:
                 db_download.torrent_hash = torrent_hash
             db_download.status = DownloadStatus.DOWNLOADING
-            db.commit()
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+                # Torrent was already added to qBittorrent - update anyway without unique hash
+                db_download.torrent_hash = None
+                db_download.status = DownloadStatus.DOWNLOADING
+                db.commit()
             db.refresh(db_download)
             logger.info("Torrent added to qBittorrent", download_id=db_download.id)
             return db_download
@@ -139,6 +155,7 @@ async def create_download(
     except HTTPException:
         raise
     except Exception as e:
+        db.rollback()
         db_download.status = DownloadStatus.FAILED
         db_download.error_message = str(e)
         db.commit()

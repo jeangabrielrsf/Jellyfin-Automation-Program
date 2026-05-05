@@ -1,6 +1,6 @@
 """Background worker to monitor qBittorrent downloads and update database."""
 import asyncio
-from typing import Optional
+from typing import Optional, Callable, Awaitable
 from app.database import SessionLocal
 from app.models.download import Download, DownloadStatus
 from app.services.qbittorrent_service import QBittorrentService
@@ -13,6 +13,9 @@ class DownloadWorker:
     """Background worker that syncs qBittorrent download state with the database."""
     
     INTERVAL = 10  # seconds between syncs
+    
+    def __init__(self, broadcast_callback: Optional[Callable[[dict], Awaitable[None]]] = None):
+        self.broadcast_callback = broadcast_callback
     
     # qBittorrent state → app status mapping
     STATE_MAPPING = {
@@ -102,15 +105,22 @@ class DownloadWorker:
                     
                     # Trigger organization when completed
                     if new_status == DownloadStatus.COMPLETED:
-                        await self._organize_completed_download(download)
+                        await self._organize_completed_download(download, db)
                 
                 db.commit()
+                
+                # Broadcast update via WebSocket if callback is set
+                if self.broadcast_callback:
+                    await self.broadcast_callback({
+                        "type": "download_update",
+                        "data": self._download_to_dict(download),
+                    })
                 
         finally:
             db.close()
             await service.close()
     
-    async def _organize_completed_download(self, download: Download):
+    async def _organize_completed_download(self, download: Download, db: object):
         """Organize files when a download completes."""
         try:
             organizer = OrganizerService(db=db)
@@ -201,3 +211,31 @@ class DownloadWorker:
             return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         else:
             return f"{minutes:02d}:{seconds:02d}"
+    
+    @staticmethod
+    def _download_to_dict(download: Download) -> dict:
+        """Serialize a Download model to a JSON-safe dict."""
+        return {
+            "id": download.id,
+            "tmdb_id": download.tmdb_id,
+            "title": download.title,
+            "type": download.type.value if download.type else None,
+            "season": download.season,
+            "episode": download.episode,
+            "torrent_name": download.torrent_name,
+            "torrent_hash": download.torrent_hash,
+            "magnet_link": download.magnet_link,
+            "quality": download.quality,
+            "language_preference": download.language_preference,
+            "status": download.status.value if download.status else None,
+            "progress": download.progress,
+            "speed": download.speed,
+            "eta": download.eta,
+            "source_folder": download.source_folder,
+            "destination_folder": download.destination_folder,
+            "indexer_used": download.indexer_used,
+            "error_message": download.error_message,
+            "created_at": download.created_at.isoformat() if download.created_at else None,
+            "updated_at": download.updated_at.isoformat() if download.updated_at else None,
+            "completed_at": download.completed_at.isoformat() if download.completed_at else None,
+        }

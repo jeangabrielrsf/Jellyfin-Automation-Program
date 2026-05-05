@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.logging_config import get_logger
 from app.services.settings_service import get_media_paths
+from app.services.path_converter import is_wsl2, windows_to_wsl
 
 logger = get_logger(__name__)
 
@@ -66,6 +67,10 @@ class PathResolver:
             movies_path = settings.movies_path
             series_path = settings.series_path
             animes_path = settings.animes_path
+
+        movies_path = self._validate_base_path(movies_path, "movies_path")
+        series_path = self._validate_base_path(series_path, "series_path")
+        animes_path = self._validate_base_path(animes_path, "animes_path")
         
         # Extract season/episode from torrent name if not provided
         if media_type in ("series", "anime") and season is None and torrent_name:
@@ -121,3 +126,41 @@ class PathResolver:
         # Trim leading/trailing dots and spaces
         filename = filename.strip('. ')
         return filename
+
+    @staticmethod
+    def _validate_base_path(path: str, setting_name: str) -> str:
+        """Validate a base path setting and auto-convert Windows paths on WSL2.
+
+        Raises ValueError if the path doesn't exist or isn't writable.
+        """
+        path = path.strip()
+
+        if not path:
+            raise ValueError(
+                f"'{setting_name}' is not configured. Set it in Settings or .env file."
+            )
+
+        # Auto-convert Windows path entered on WSL2
+        if is_wsl2() and len(path) >= 2 and path[1] == ":":
+            converted = windows_to_wsl(path)
+            logger.info("Auto-converted Windows path to WSL during resolution",
+                       setting=setting_name, original=path, converted=converted)
+            path = converted
+
+        # Reject backslash paths on Linux
+        if "\\" in path and "/" not in path:
+            raise ValueError(
+                f"'{setting_name}' contains Windows-style backslashes. "
+                f"Use forward slashes (e.g., /mnt/d/Filmes or D:/Filmes). "
+                f"Current value: '{path}'"
+            )
+
+        resolved = Path(path).resolve()
+        if not resolved.exists():
+            logger.warning("Base path does not exist", setting=setting_name, path=str(resolved))
+        elif not resolved.is_dir():
+            raise ValueError(
+                f"'{setting_name}' path is not a directory: {str(resolved)}"
+            )
+
+        return path
