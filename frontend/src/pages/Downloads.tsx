@@ -1,4 +1,5 @@
 import React from 'react';
+import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DownloadMonitor } from '../components/DownloadMonitor';
 import { downloadAPI } from '../services/api';
@@ -25,6 +26,20 @@ const DownloadsPage: React.FC = () => {
     mutationFn: (id: number) => downloadAPI.cancelDownload(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['downloads'] }),
   });
+
+  const clearMutation = useMutation({
+    mutationFn: () => downloadAPI.clearDownloads(),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['downloads'] });
+      const result = response.data as { deleted: number; skipped: number };
+      toast.success(`${result.deleted} download(s) removido(s)`);
+    },
+    onError: () => {
+      toast.error('Erro ao limpar downloads');
+    },
+  });
+
+  const handleClear = () => clearMutation.mutate();
 
   const handlePause = (id: number) => pauseMutation.mutate(id);
   const handleResume = (id: number) => resumeMutation.mutate(id);
@@ -69,6 +84,7 @@ const DownloadsPage: React.FC = () => {
         onPause={handlePause}
         onResume={handleResume}
         onCancel={handleCancel}
+        onClear={handleClear}
       />
     </div>
   );
