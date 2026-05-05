@@ -16,7 +16,9 @@ def mock_qbit_service():
             "progress": 0.5,
             "dlspeed": 1048576,
             "eta": 3600,
-            "state": "downloading"
+            "state": "downloading",
+            "num_seeds": 42,
+            "num_leechs": 7
         }
     ])
     service.close = AsyncMock()
@@ -43,6 +45,8 @@ async def test_sync_progress_updates_download(mock_db, mock_qbit_service):
     assert mock_download.speed == "1.0 MB/s"
     assert mock_download.eta == "01:00:00"
     assert mock_download.status.value == "downloading"
+    assert mock_download.seeds == 42
+    assert mock_download.peers == 7
     mock_db.commit.assert_called_once()
 
 @pytest.mark.asyncio

@@ -87,6 +87,8 @@ class DownloadWorker:
                 download.progress = torrent.get("progress", 0.0)
                 download.speed = self._format_speed(torrent.get("dlspeed", 0))
                 download.eta = self._format_eta(torrent.get("eta", 0))
+                download.seeds = torrent.get("num_seeds") or torrent.get("seeds")
+                download.peers = torrent.get("num_leechs") or torrent.get("peers")
                 
                 # Map qBittorrent state to app status
                 qb_state = torrent.get("state", "").lower()
@@ -270,6 +272,8 @@ class DownloadWorker:
             "source_folder": download.source_folder,
             "destination_folder": download.destination_folder,
             "indexer_used": download.indexer_used,
+            "seeds": download.seeds,
+            "peers": download.peers,
             "error_message": download.error_message,
             "created_at": download.created_at.isoformat() if download.created_at else None,
             "updated_at": download.updated_at.isoformat() if download.updated_at else None,

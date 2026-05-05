@@ -168,7 +168,7 @@ class TestDownloadsRouter:
             "title": "Test Movie",
             "media_type": "movie",
             "torrent_name": "Test Movie 1080p",
-            "magnet_link": "magnet:?xt=urn:btih:test",
+            "magnet_link": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
             "quality": "1080p",
             "language_preference": "legendado"
         }
@@ -193,7 +193,7 @@ class TestDownloadsRouter:
             "title": "Test Show",
             "media_type": "series",
             "torrent_name": "Test.Show.S01E05.1080p",
-            "magnet_link": "magnet:?xt=urn:btih:test2",
+            "magnet_link": "magnet:?xt=urn:btih:1234567890abcdef1234567890abcdef12345678",
             "quality": "1080p",
             "language_preference": "legendado",
             "season": 1,
@@ -215,6 +215,38 @@ class TestDownloadsRouter:
         mock_instance.add_torrent.assert_awaited_once()
         mock_instance.close.assert_awaited_once()
 
+    def test_create_download_without_magnet_uses_tag_for_hash(self, client, db_session):
+        """Test creating a download without magnet link gets hash via tag lookup."""
+        payload = {
+            "tmdb_id": 3,
+            "title": "Test Movie No Magnet",
+            "media_type": "movie",
+            "torrent_name": "Test Movie No Magnet 1080p",
+            "download_url": "http://example.com/torrent",
+            "quality": "1080p",
+            "language_preference": "legendado"
+        }
+        with patch('app.routers.downloads.QBittorrentService') as mock_service_class:
+            mock_instance = mock_service_class.return_value
+            mock_instance.add_torrent = AsyncMock(return_value=True)
+            mock_instance.get_torrents_by_tag = AsyncMock(return_value=[
+                {"hash": "deadbeef1234567890abcdef1234567890abcdef12"}
+            ])
+            mock_instance.close = AsyncMock()
+            response = client.post("/api/downloads/", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["title"] == "Test Movie No Magnet"
+        assert data["status"] == "downloading"
+        assert data["torrent_hash"] == "deadbeef1234567890abcdef1234567890abcdef12"
+        mock_instance.add_torrent.assert_awaited_once()
+        # Verify tag was passed
+        call_kwargs = mock_instance.add_torrent.await_args.kwargs
+        assert "tags" in call_kwargs
+        assert call_kwargs["tags"].startswith("jellyfin-auto-")
+        mock_instance.get_torrents_by_tag.assert_awaited_once()
+        mock_instance.close.assert_awaited_once()
+
     def test_get_download(self, client, db_session):
         """Test getting a specific download."""
         download = Download(
@@ -222,7 +254,7 @@ class TestDownloadsRouter:
             title="Test",
             type=ContentType.MOVIE,
             torrent_name="Test",
-            magnet_link="magnet:?xt=urn:btih:test",
+            magnet_link="magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
             status=DownloadStatus.PENDING
         )
         db_session.add(download)
@@ -241,7 +273,7 @@ class TestDownloadsRouter:
             title="Test",
             type=ContentType.MOVIE,
             torrent_name="Test",
-            magnet_link="magnet:?xt=urn:btih:test",
+            magnet_link="magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
             status=DownloadStatus.PENDING
         )
         db_session.add(download)

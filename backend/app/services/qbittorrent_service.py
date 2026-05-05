@@ -41,7 +41,7 @@ class QBittorrentService:
             logger.error("qBittorrent authentication error", error=str(e))
             return False
     
-    async def add_torrent(self, magnet_link: Optional[str] = None, download_url: Optional[str] = None, save_path: Optional[str] = None, category: Optional[str] = None, torrent_name: Optional[str] = None) -> bool:
+    async def add_torrent(self, magnet_link: Optional[str] = None, download_url: Optional[str] = None, save_path: Optional[str] = None, category: Optional[str] = None, torrent_name: Optional[str] = None, tags: Optional[str] = None) -> bool:
         """Add torrent to qBittorrent."""
         logger.info("Adding torrent to qBittorrent", magnet_link=magnet_link[:50] if magnet_link else None, download_url=download_url[:50] if download_url else None, save_path=save_path, category=category)
         if not await self._authenticate():
@@ -62,6 +62,8 @@ class QBittorrentService:
             data["savepath"] = save_path
         if category:
             data["category"] = category
+        if tags:
+            data["tags"] = tags
         
         try:
             add_url = f"{self.settings.qbittorrent_host}/api/v2/torrents/add"
@@ -281,6 +283,23 @@ class QBittorrentService:
         except Exception as e:
             logger.error("Failed to get fresh Jackett link", error=str(e))
             return None
+    
+    async def get_torrents_by_tag(self, tag: str) -> List[Dict]:
+        """Get torrents filtered by tag."""
+        if not await self._authenticate():
+            return []
+        
+        try:
+            response = await self.client.get(
+                f"{self.settings.qbittorrent_host}/api/v2/torrents/info",
+                params={"tag": tag}
+            )
+            response.raise_for_status()
+            return response.json()
+            
+        except httpx.HTTPError as e:
+            logger.error("Failed to get torrents by tag", error=str(e), tag=tag)
+            return []
     
     async def get_torrents(self) -> List[Dict]:
         """Get list of all torrents."""

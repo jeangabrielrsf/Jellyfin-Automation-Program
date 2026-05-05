@@ -126,17 +126,29 @@ async def create_download(
     logger.info("Creating download", magnet_link=magnet_link, download_url=download_url, torrent_name=download.torrent_name)
     service = QBittorrentService()
     try:
+        # Tag única para identificar o torrent no qBittorrent
+        tag = f"jellyfin-auto-{db_download.id}"
         success = await service.add_torrent(
             magnet_link=magnet_link,
             download_url=download_url,
             category=download.media_type.value,
             torrent_name=download.torrent_name,
-            save_path=qb_save_path
+            save_path=qb_save_path,
+            tags=tag
         )
         if success:
             # Try to extract hash from magnet link
             hash_source = magnet_link if magnet_link else download_url
             torrent_hash = _extract_hash_from_magnet(hash_source) if hash_source and hash_source.startswith("magnet:") else None
+            if not torrent_hash:
+                # Se não for magnet, buscar hash via tag no qBittorrent
+                try:
+                    torrents = await service.get_torrents_by_tag(tag)
+                    if torrents:
+                        torrent_hash = torrents[0].get("hash")
+                        logger.info("Hash obtido via tag", download_id=db_download.id, hash=torrent_hash)
+                except Exception as e:
+                    logger.warning("Falha ao obter hash via tag", download_id=db_download.id, error=str(e))
             if torrent_hash:
                 db_download.torrent_hash = torrent_hash
             db_download.status = DownloadStatus.DOWNLOADING
@@ -149,7 +161,7 @@ async def create_download(
                 db_download.status = DownloadStatus.DOWNLOADING
                 db.commit()
             db.refresh(db_download)
-            logger.info("Torrent added to qBittorrent", download_id=db_download.id)
+            logger.info("Torrent added to qBittorrent", download_id=db_download.id, hash=db_download.torrent_hash)
             return db_download
         else:
             db_download.status = DownloadStatus.FAILED
