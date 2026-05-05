@@ -108,8 +108,8 @@ class OrganizerService:
         video_files = []
         if path.is_dir():
             for ext in self.VIDEO_EXTENSIONS:
-                video_files.extend(path.glob(f"*{ext}"))
-                video_files.extend(path.glob(f"*{ext.upper()}"))
+                video_files.extend(path.rglob(f"*{ext}"))
+                video_files.extend(path.rglob(f"*{ext.upper()}"))
         
         video_files.sort(key=lambda x: x.stat().st_size, reverse=True)
         return video_files

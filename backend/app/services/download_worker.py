@@ -122,19 +122,35 @@ class DownloadWorker:
     
     async def _organize_completed_download(self, download: Download, db: object):
         """Organize files when a download completes."""
+        service = QBittorrentService()
+        torrent_hash = download.torrent_hash
+        was_paused = False
+
         try:
+            if torrent_hash:
+                await service.pause_torrent(torrent_hash)
+                was_paused = True
+                await asyncio.sleep(1)
+
             organizer = OrganizerService(db=db)
-            
+            dest_path = None
+
             if download.type.value == "movie":
+                dest_path = organizer.organize_movie(
+                    source_path=download.source_folder,
+                    title=download.title,
+                    year=None,
+                    quality=download.quality or "1080p"
+                )
                 logger.info(
-                    "Movie download completed",
+                    "Movie organized",
                     download_id=download.id,
                     title=download.title,
-                    source_folder=download.source_folder
+                    destination=dest_path
                 )
             elif download.type.value == "series":
                 if download.season and download.episode:
-                    organizer.organize_series(
+                    dest_path = organizer.organize_series(
                         source_path=download.source_folder,
                         title=download.title,
                         season=download.season,
@@ -155,7 +171,7 @@ class DownloadWorker:
                     )
             elif download.type.value == "anime":
                 if download.season and download.episode:
-                    organizer.organize_anime(
+                    dest_path = organizer.organize_anime(
                         source_path=download.source_folder,
                         title=download.title,
                         season=download.season,
@@ -174,12 +190,32 @@ class DownloadWorker:
                         "Cannot organize anime without season/episode",
                         download_id=download.id
                     )
+
+            if dest_path:
+                download.status = DownloadStatus.ORGANIZED
+                download.destination_folder = dest_path
+                db.commit()
+
+            if torrent_hash:
+                await service.delete_torrent(torrent_hash, delete_files=False)
+
         except Exception as e:
             logger.error(
                 "Failed to organize completed download",
                 download_id=download.id,
                 error=str(e)
             )
+            if was_paused and torrent_hash:
+                try:
+                    await service.resume_torrent(torrent_hash)
+                except Exception as resume_error:
+                    logger.error(
+                        "Failed to resume torrent after organize failure",
+                        download_id=download.id,
+                        error=str(resume_error)
+                    )
+        finally:
+            await service.close()
     
     @staticmethod
     def _format_speed(speed_bytes: int) -> str:
