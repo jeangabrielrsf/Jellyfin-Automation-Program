@@ -78,6 +78,9 @@ const DetailPage: React.FC = () => {
         quality: torrent.quality || '1080p',
         language_preference: torrent.language || 'legendado',
         indexer_used: torrent.indexer,
+        size: torrent.size,
+        seeds: torrent.seeds,
+        peers: torrent.peers,
         season: selectedSeason ? Number(selectedSeason) : undefined,
         episode: selectedEpisode !== 'temporada-inteira' ? Number(selectedEpisode) : undefined,
       });

@@ -62,6 +62,14 @@ export interface Download {
   progress: number;
   speed?: string;
   eta?: string;
+  source_folder?: string;
+  destination_folder?: string;
+  indexer_used?: string;
+  size?: string;
+  seeds?: number;
+  peers?: number;
+  season?: number;
+  episode?: number;
   error_message?: string;
   created_at: string;
 }

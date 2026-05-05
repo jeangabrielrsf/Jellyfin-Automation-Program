@@ -60,6 +60,9 @@ export const downloadAPI = {
     quality?: string;
     language_preference?: string;
     indexer_used?: string;
+    size?: string;
+    seeds?: number;
+    peers?: number;
     season?: number;
     episode?: number;
   }) => api.post('/downloads/', {
