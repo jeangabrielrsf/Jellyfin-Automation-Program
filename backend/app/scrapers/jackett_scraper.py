@@ -1,6 +1,7 @@
 """Jackett scraper implementation."""
 import json
 import re
+import time
 from typing import List
 
 import httpx
@@ -36,8 +37,15 @@ class JackettScraper(BaseScraper):
             "Category": self._get_category(media_type)
         }
         
+        logger.debug("Jackett request", url=url, params={"Query": query, "Category": params["Category"]})
+        
         try:
+            start = time.time()
             response = await self.client.get(url, params=params)
+            elapsed = time.time() - start
+            
+            logger.debug("Jackett response", status_code=response.status_code, elapsed=f"{elapsed:.2f}s")
+            
             response.raise_for_status()
             data = response.json()
             
@@ -63,8 +71,44 @@ class JackettScraper(BaseScraper):
             logger.info("Jackett search completed", results_count=len(results))
             return results
             
-        except (httpx.HTTPError, json.JSONDecodeError) as e:
-            logger.error("Jackett search failed", error=str(e))
+        except httpx.ConnectError as e:
+            logger.error(
+                "Jackett connection error — check if Jackett is running and accessible from the container",
+                url=self.settings.jackett_url,
+                error=str(e)
+            )
+            return []
+        except httpx.TimeoutException as e:
+            logger.error(
+                "Jackett request timed out — the service may be overloaded or unreachable",
+                url=self.settings.jackett_url,
+                timeout=60,
+                error=str(e)
+            )
+            return []
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                "Jackett returned an HTTP error",
+                url=self.settings.jackett_url,
+                status_code=e.response.status_code,
+                response_body=e.response.text[:200],
+                error=str(e)
+            )
+            return []
+        except json.JSONDecodeError as e:
+            logger.error(
+                "Failed to decode Jackett response as JSON",
+                url=self.settings.jackett_url,
+                error=str(e)
+            )
+            return []
+        except Exception as e:
+            logger.error(
+                "Jackett search failed with unexpected error",
+                url=self.settings.jackett_url,
+                error_type=type(e).__name__,
+                error=str(e)
+            )
             return []
     
     async def get_magnet(self, torrent_id: str) -> str:
