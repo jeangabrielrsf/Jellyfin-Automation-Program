@@ -338,8 +338,20 @@ class QBittorrentService:
             response.raise_for_status()
             return True
             
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                "Failed to pause torrent",
+                torrent_hash=torrent_hash,
+                status=e.response.status_code,
+                response=e.response.text
+            )
+            return False
         except httpx.HTTPError as e:
-            logger.error("Failed to pause torrent", error=str(e))
+            logger.error(
+                "Failed to pause torrent",
+                torrent_hash=torrent_hash,
+                error=str(e)
+            )
             return False
     
     async def resume_torrent(self, torrent_hash: str) -> bool:
@@ -355,8 +367,20 @@ class QBittorrentService:
             response.raise_for_status()
             return True
             
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                "Failed to resume torrent",
+                torrent_hash=torrent_hash,
+                status=e.response.status_code,
+                response=e.response.text
+            )
+            return False
         except httpx.HTTPError as e:
-            logger.error("Failed to resume torrent", error=str(e))
+            logger.error(
+                "Failed to resume torrent",
+                torrent_hash=torrent_hash,
+                error=str(e)
+            )
             return False
     
     async def delete_torrent(self, torrent_hash: str, delete_files: bool = False) -> bool:

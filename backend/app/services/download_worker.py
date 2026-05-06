@@ -49,8 +49,7 @@ class DownloadWorker:
     async def _sync_progress(self):
         """Sync download progress from qBittorrent to database."""
         db = SessionLocal()
-        service = QBittorrentService()
-        
+
         try:
             # Get all downloading downloads from DB
             downloading_statuses = [
@@ -60,67 +59,70 @@ class DownloadWorker:
             downloads = db.query(Download).filter(
                 Download.status.in_(downloading_statuses)
             ).all()
-            
+
             if not downloads:
                 return
-            
-            # Get all torrents from qBittorrent
-            torrents = await service.get_torrents()
-            
-            # Build hash → torrent lookup
-            torrent_map = {t["hash"].lower(): t for t in torrents if t.get("hash")}
-            
-            for download in downloads:
-                if not download.torrent_hash:
-                    continue
-                
-                torrent = torrent_map.get(download.torrent_hash.lower())
-                if not torrent:
-                    logger.warning(
-                        "Torrent not found in qBittorrent",
-                        download_id=download.id,
-                        torrent_hash=download.torrent_hash
-                    )
-                    continue
-                
-                # Update progress
-                download.progress = torrent.get("progress", 0.0)
-                download.speed = self._format_speed(torrent.get("dlspeed", 0))
-                download.eta = self._format_eta(torrent.get("eta", 0))
-                download.seeds = torrent.get("num_seeds") or torrent.get("seeds")
-                download.peers = torrent.get("num_leechs") or torrent.get("peers")
-                
-                # Map qBittorrent state to app status
-                qb_state = torrent.get("state", "").lower()
-                new_status = self.STATE_MAPPING.get(qb_state)
-                
-                if new_status and new_status != download.status:
-                    old_status = download.status
-                    download.status = new_status
-                    logger.info(
-                        "Download status changed",
-                        download_id=download.id,
-                        old_status=old_status.value if old_status else None,
-                        new_status=new_status.value,
-                        progress=download.progress
-                    )
-                    
-                    # Trigger organization when completed
-                    if new_status == DownloadStatus.COMPLETED:
-                        await self._organize_completed_download(download, db)
-                
-                db.commit()
-                
-                # Broadcast update via WebSocket if callback is set
-                if self.broadcast_callback:
-                    await self.broadcast_callback({
-                        "type": "download_update",
-                        "data": self._download_to_dict(download),
-                    })
-                
+
+            service = QBittorrentService()
+            try:
+                # Get all torrents from qBittorrent
+                torrents = await service.get_torrents()
+
+                # Build hash → torrent lookup
+                torrent_map = {t["hash"].lower(): t for t in torrents if t.get("hash")}
+
+                for download in downloads:
+                    if not download.torrent_hash:
+                        continue
+
+                    torrent = torrent_map.get(download.torrent_hash.lower())
+                    if not torrent:
+                        logger.warning(
+                            "Torrent not found in qBittorrent",
+                            download_id=download.id,
+                            torrent_hash=download.torrent_hash
+                        )
+                        continue
+
+                    # Update progress
+                    download.progress = torrent.get("progress", 0.0)
+                    download.speed = self._format_speed(torrent.get("dlspeed", 0))
+                    download.eta = self._format_eta(torrent.get("eta", 0))
+                    download.seeds = torrent.get("num_seeds") or torrent.get("seeds")
+                    download.peers = torrent.get("num_leechs") or torrent.get("peers")
+
+                    # Map qBittorrent state to app status
+                    qb_state = torrent.get("state", "").lower()
+                    new_status = self.STATE_MAPPING.get(qb_state)
+
+                    if new_status and new_status != download.status:
+                        old_status = download.status
+                        download.status = new_status
+                        logger.info(
+                            "Download status changed",
+                            download_id=download.id,
+                            old_status=old_status.value if old_status else None,
+                            new_status=new_status.value,
+                            progress=download.progress
+                        )
+
+                        # Trigger organization when completed
+                        if new_status == DownloadStatus.COMPLETED:
+                            await self._organize_completed_download(download, db)
+
+                    db.commit()
+
+                    # Broadcast update via WebSocket if callback is set
+                    if self.broadcast_callback:
+                        await self.broadcast_callback({
+                            "type": "download_update",
+                            "data": self._download_to_dict(download),
+                        })
+            finally:
+                await service.close()
+
         finally:
             db.close()
-            await service.close()
     
     async def _organize_completed_download(self, download: Download, db: object):
         """Organize files when a download completes."""
@@ -130,15 +132,15 @@ class DownloadWorker:
 
         try:
             if torrent_hash:
-                await service.pause_torrent(torrent_hash)
-                was_paused = True
-                await asyncio.sleep(1)
+                was_paused = await service.pause_torrent(torrent_hash)
+                if was_paused:
+                    await asyncio.sleep(1)
 
             organizer = OrganizerService(db=db)
             dest_path = None
 
             if download.type.value == "movie":
-                dest_path = organizer.organize_movie(
+                dest_path = await organizer.organize_movie(
                     source_path=download.source_folder,
                     title=download.title,
                     year=None,
@@ -152,7 +154,7 @@ class DownloadWorker:
                 )
             elif download.type.value == "series":
                 if download.season and download.episode:
-                    dest_path = organizer.organize_series(
+                    dest_path = await organizer.organize_series(
                         source_path=download.source_folder,
                         title=download.title,
                         season=download.season,
@@ -173,7 +175,7 @@ class DownloadWorker:
                     )
             elif download.type.value == "anime":
                 if download.season and download.episode:
-                    dest_path = organizer.organize_anime(
+                    dest_path = await organizer.organize_anime(
                         source_path=download.source_folder,
                         title=download.title,
                         season=download.season,

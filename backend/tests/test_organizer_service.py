@@ -49,69 +49,73 @@ def test_get_video_files(organizer_service, tmp_path):
     assert len(video_files) == 1
     assert video_files[0].name == "movie.mp4"
 
-def test_organize_movie(organizer_service, temp_media_dirs, tmp_path):
+@pytest.mark.asyncio
+async def test_organize_movie(organizer_service, temp_media_dirs, tmp_path):
     """Test movie organization."""
     source_file = tmp_path / "movie.mkv"
     source_file.write_text("fake video content")
-    
-    result = organizer_service.organize_movie(
+
+    result = await organizer_service.organize_movie(
         source_path=str(source_file),
         title="Test Movie",
         year=2023,
         quality="1080p"
     )
-    
+
     dest_path = Path(result)
     assert dest_path.exists()
     assert not source_file.exists()  # source was moved
     assert "Test Movie (2023)" in result
     assert "1080p" in result
 
-def test_organize_series(organizer_service, temp_media_dirs, tmp_path):
+@pytest.mark.asyncio
+async def test_organize_series(organizer_service, temp_media_dirs, tmp_path):
     """Test series episode organization."""
     source_file = tmp_path / "episode.mkv"
     source_file.write_text("fake video content")
-    
-    result = organizer_service.organize_series(
+
+    result = await organizer_service.organize_series(
         source_path=str(source_file),
         title="Test Show",
         season=1,
         episode=5,
         quality="1080p"
     )
-    
+
     dest_path = Path(result)
     assert dest_path.exists()
     assert not source_file.exists()
     assert "Season 01" in result
     assert "S01E05" in result
 
-def test_organize_anime(organizer_service, temp_media_dirs, tmp_path):
+@pytest.mark.asyncio
+async def test_organize_anime(organizer_service, temp_media_dirs, tmp_path):
     """Test anime episode organization."""
     source_file = tmp_path / "anime.mkv"
     source_file.write_text("fake video content")
-    
-    result = organizer_service.organize_anime(
+
+    result = await organizer_service.organize_anime(
         source_path=str(source_file),
         title="Test Anime",
         season=1,
         episode=3,
         quality="1080p"
     )
-    
+
     dest_path = Path(result)
     assert dest_path.exists()
     assert not source_file.exists()
     assert "Season 01" in result
     assert "S01E03" in result
 
-def test_organize_movie_no_video_files(organizer_service, temp_media_dirs, tmp_path):
+@pytest.mark.asyncio
+async def test_organize_movie_no_video_files(organizer_service, temp_media_dirs, tmp_path):
     """Test that organizing a directory with no video files raises ValueError."""
     empty_dir = tmp_path / "empty"
     empty_dir.mkdir()
-    
+
     with pytest.raises(ValueError, match="No video files found"):
-        organizer_service.organize_movie(
+        await organizer_service.organize_movie(
             source_path=str(empty_dir),
             title="Test Movie",
             year=2023,
