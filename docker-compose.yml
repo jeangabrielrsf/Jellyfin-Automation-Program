@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:15-alpine
+    restart: always
     init: true
     stop_grace_period: 10s
     environment:
@@ -19,6 +20,7 @@ services:
 
   backend:
     build: ./backend
+    restart: always
     init: true
     stop_grace_period: 10s
     environment:
@@ -46,6 +48,7 @@ services:
       - ./backend/logs:/app/logs
 
   frontend:
+    restart: always
     build: ./frontend
     init: true
     stop_grace_period: 10s
