@@ -96,7 +96,7 @@ export const filesystemAPI = {
 
 export const logsAPI = {
   getLogs: (params?: { level?: string; lines?: number; search?: string }) =>
-    api.get('/logs', { params }),
+    api.get('/logs/', { params }),
 };
 
 export default api;
