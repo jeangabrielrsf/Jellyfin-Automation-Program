@@ -1,11 +1,14 @@
 """Discover Pydantic models."""
+from typing import Optional, List
+
 from pydantic import BaseModel
+
 from app.models.tmdb import TMDBSearchResult
 
 
 class DiscoverParams(BaseModel):
-    genre_id: int | None = None
-    media_type: str | None = None  # "movie" | "series" | "anime"
+    genre_id: Optional[int] = None
+    media_type: Optional[str] = None  # "movie" | "series" | "anime"
     sort_by: str = "popularity.desc"
 
 
@@ -16,14 +19,14 @@ class SectionInfo(BaseModel):
 
 
 class SectionCatalog(BaseModel):
-    sections: list[SectionInfo]
+    sections: List[SectionInfo]
 
 
 class DiscoverSection(BaseModel):
     id: str
     title: str
     media_type: str
-    results: list[TMDBSearchResult]
+    results: List[TMDBSearchResult]
     total_results: int
 
 
