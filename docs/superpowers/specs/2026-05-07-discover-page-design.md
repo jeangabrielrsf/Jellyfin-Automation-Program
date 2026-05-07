@@ -99,9 +99,37 @@ get_section(section_id, params):
   return DiscoverSection with top 20
 ```
 
+### TMDB call volume and caching
+
+Without caching, a single page load on `/discover` triggers up to **13 TMDB API calls** (one per section + genre lists). With multiple users, this can degrade performance and approach TMDB rate limits unnecessarily, since most of this data (popular lists, top rated) changes slowly over hours.
+
+**Recommendation: in-memory TTL cache** in `DiscoverService`:
+
+```python
+_cache: dict[str, tuple[float, DiscoverSection]] = {}
+
+def get_section(section_id, params):
+    key = f"{section_id}:{params.genre_id}:{params.media_type}:{params.sort_by}"
+    if key in _cache and not expired(_cache[key], ttl=300):  # 5 min
+        return _cache[key][1]
+    data = _fetch_from_tmdb(...)
+    _cache[key] = (time.time(), data)
+    return data
+```
+
+- **Cache key**: section_id + filter params combination
+- **TTL**: 5 minutes for section data, 1 hour for genres
+- **Scope**: in-memory per worker (does NOT survive restart, but restarts are rare in prod)
+- **Effect**: first user pays the 13 TMDB calls; subsequent users within the TTL window pay 0
+- **Trade-off**: data may be up to 5 minutes stale — acceptable for browse/discovery content
+
+Alternative considered and rejected for now:
+- **Redis/DB cache**: adds infrastructure dependency for ephemeral data that doesn't need to survive restarts
+- **Bulk endpoint** (return all sections in one response): loses progressive loading UX
+
 ### Genre endpoint
 
-`GET /genre/movie/list` + `GET /genre/tv/list` merged by id, cached for 1 hour server-side.
+`GET /genre/movie/list` + `GET /genre/tv/list` merged by id, cached for 1 hour server-side (same TTL cache mechanism).
 
 ### Router integration
 
@@ -233,6 +261,8 @@ When any filter changes → all `DiscoverRow` queries refetch automatically (Tan
 - `test_get_section_trending_empty_when_filtered`
 - `test_get_genres_merges_movie_and_tv_lists`
 - `test_genres_endpoint_cached`
+- `test_section_cache_hit_avoids_tmdb_call` — second request within TTL hits cache, no TMDB call
+- `test_section_cache_expired_refetches` — after TTL, cache miss triggers new TMDB call
 
 ### Frontend
 
