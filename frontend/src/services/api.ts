@@ -99,4 +99,20 @@ export const logsAPI = {
     api.get('/logs/', { params }),
 };
 
+export const discoverAPI = {
+  getSections: (params?: {
+    genre_id?: number | null;
+    media_type?: string | null;
+    sort_by?: string;
+  }) => api.get('/discover/sections/', { params }),
+
+  getSection: (id: string, params?: {
+    genre_id?: number | null;
+    media_type?: string | null;
+    sort_by?: string;
+  }) => api.get(`/discover/sections/${id}/`, { params }),
+
+  getGenres: () => api.get('/discover/genres/'),
+};
+
 export default api;
