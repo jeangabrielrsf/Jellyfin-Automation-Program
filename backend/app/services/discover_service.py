@@ -1,5 +1,6 @@
 """Discover service — TMDB section data with in-memory TTL cache."""
 import time
+import httpx
 from typing import Optional, List, Dict, Tuple
 from app.config import get_settings
 from app.models.discover import (
@@ -49,8 +50,13 @@ class DiscoverService:
     def __init__(self):
         self.settings = get_settings()
         self.api_key = self.settings.tmdb_api_key
+        self.client = httpx.AsyncClient(timeout=10.0)
         self._section_cache: Dict[str, Tuple[float, DiscoverSection]] = {}
         self._genre_cache: Optional[Tuple[float, List[Genre]]] = None
+
+    async def close(self):
+        """Close the HTTP client."""
+        await self.client.aclose()
 
     def _filters_active(self, params: DiscoverParams) -> bool:
         return params.genre_id is not None or params.media_type is not None
@@ -65,8 +71,6 @@ class DiscoverService:
         return SectionCatalog(sections=sections)
 
     async def get_section(self, section_id: str, params: DiscoverParams) -> DiscoverSection:
-        import httpx
-
         # Return cached if still valid
         key = self._cache_key(section_id, params)
         cached = self._section_cache.get(key)
@@ -91,8 +95,7 @@ class DiscoverService:
             )
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                results = await self._fetch_tmdb(client, section_id, section_def, params)
+            results = await self._fetch_tmdb(self.client, section_id, section_def, params)
         except Exception:
             logger.exception("Failed to fetch section data", section_id=section_id)
             results = []
@@ -108,12 +111,11 @@ class DiscoverService:
         return section
 
     async def _fetch_tmdb(self, client, section_id: str, section_def: SectionInfo, params: DiscoverParams) -> List[TMDBSearchResult]:
-        common = {"api_key": self.api_key, "language": "pt-BR"}
+        common = {"api_key": self.api_key, "language": "pt-BR", "include_adult": "false"}
 
         use_discover = self._filters_active(params) or section_id.startswith("genre-") or section_def.media_type == "anime"
 
         if use_discover:
-            media = "tv" if section_def.media_type in ("series", "anime", "mixed") else "movie"
             if section_def.media_type == "movie":
                 media = "movie"
             elif section_def.media_type in ("series", "anime"):
@@ -189,24 +191,21 @@ class DiscoverService:
         return results
 
     async def get_genres(self) -> List[Genre]:
-        import httpx
-
         # Check cache
         if self._genre_cache:
             ts, data = self._genre_cache
             if time.time() - ts < self.GENRE_TTL:
                 return data
 
-        common = {"api_key": self.api_key, "language": "pt-BR"}
+        common = {"api_key": self.api_key, "language": "pt-BR", "include_adult": "false"}
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                movie_resp = await client.get(f"{self.BASE_URL}/genre/movie/list", params=common)
-                movie_resp.raise_for_status()
-                movie_genres = movie_resp.json().get("genres", [])
+            movie_resp = await self.client.get(f"{self.BASE_URL}/genre/movie/list", params=common)
+            movie_resp.raise_for_status()
+            movie_genres = movie_resp.json().get("genres", [])
 
-                tv_resp = await client.get(f"{self.BASE_URL}/genre/tv/list", params=common)
-                tv_resp.raise_for_status()
-                tv_genres = tv_resp.json().get("genres", [])
+            tv_resp = await self.client.get(f"{self.BASE_URL}/genre/tv/list", params=common)
+            tv_resp.raise_for_status()
+            tv_genres = tv_resp.json().get("genres", [])
 
             seen: Dict[int, str] = {}
             for g in movie_genres + tv_genres:
