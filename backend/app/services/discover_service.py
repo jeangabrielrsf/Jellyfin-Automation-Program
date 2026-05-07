@@ -1,6 +1,6 @@
 """Discover service — TMDB section data with in-memory TTL cache."""
 import time
-from typing import Optional
+from typing import Optional, List, Dict, Tuple
 from app.config import get_settings
 from app.models.discover import (
     DiscoverParams,
@@ -14,7 +14,7 @@ from app.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-SECTION_DEFS: list[SectionInfo] = [
+SECTION_DEFS: List[SectionInfo] = [
     SectionInfo(id="popular-movies", title="Filmes Populares", media_type="movie"),
     SectionInfo(id="popular-series", title="Séries Populares", media_type="series"),
     SectionInfo(id="popular-animes", title="Animes Populares", media_type="anime"),
@@ -49,8 +49,8 @@ class DiscoverService:
     def __init__(self):
         self.settings = get_settings()
         self.api_key = self.settings.tmdb_api_key
-        self._section_cache: dict[str, tuple[float, DiscoverSection]] = {}
-        self._genre_cache: Optional[tuple[float, list[Genre]]] = None
+        self._section_cache: Dict[str, Tuple[float, DiscoverSection]] = {}
+        self._genre_cache: Optional[Tuple[float, List[Genre]]] = None
 
     def _filters_active(self, params: DiscoverParams) -> bool:
         return params.genre_id is not None or params.media_type is not None
@@ -107,7 +107,7 @@ class DiscoverService:
         self._section_cache[key] = (time.time(), section)
         return section
 
-    async def _fetch_tmdb(self, client, section_id: str, section_def: SectionInfo, params: DiscoverParams) -> list[TMDBSearchResult]:
+    async def _fetch_tmdb(self, client, section_id: str, section_def: SectionInfo, params: DiscoverParams) -> List[TMDBSearchResult]:
         common = {"api_key": self.api_key, "language": "pt-BR"}
 
         use_discover = self._filters_active(params) or section_id.startswith("genre-") or section_def.media_type == "anime"
@@ -139,12 +139,6 @@ class DiscoverService:
                 if params.genre_id and params.genre_id != ANIME_GENRE_ID:
                     query["with_genres"] = f"{ANIME_GENRE_ID},{params.genre_id}"
 
-            if params.media_type == "movie":
-                query["with_genres"] = query.get("with_genres", "")
-                # already constrained by media=movie
-            elif params.media_type == "series":
-                query["with_genres"] = query.get("with_genres", "")
-                # already constrained by media=tv
         else:
             # Native endpoints (no filters)
             path: str
@@ -174,7 +168,7 @@ class DiscoverService:
         data = response.json()
 
         raw = data.get("results", [])[:20]
-        results: list[TMDBSearchResult] = []
+        results: List[TMDBSearchResult] = []
         for item in raw:
             mt = item.get("media_type", "")
             if not mt:
@@ -194,7 +188,7 @@ class DiscoverService:
             ))
         return results
 
-    async def get_genres(self) -> list[Genre]:
+    async def get_genres(self) -> List[Genre]:
         import httpx
 
         # Check cache
@@ -214,7 +208,7 @@ class DiscoverService:
                 tv_resp.raise_for_status()
                 tv_genres = tv_resp.json().get("genres", [])
 
-            seen: dict[int, str] = {}
+            seen: Dict[int, str] = {}
             for g in movie_genres + tv_genres:
                 gid = g["id"]
                 if gid not in seen:
