@@ -9,7 +9,7 @@ from app.services.discover_service import DiscoverService
 router = APIRouter(prefix="/api/discover", tags=["discover"])
 
 
-@router.get("/sections", response_model=SectionCatalog)
+@router.get("/sections/", response_model=SectionCatalog)
 async def get_sections_catalog(
     genre_id: Optional[int] = Query(None),
     media_type: Optional[str] = Query(None, pattern="^(movie|series|anime)$"),
@@ -24,7 +24,7 @@ async def get_sections_catalog(
         await service.close()
 
 
-@router.get("/sections/{section_id}", response_model=DiscoverSection)
+@router.get("/sections/{section_id}/", response_model=DiscoverSection)
 async def get_section(
     section_id: str,
     genre_id: Optional[int] = Query(None),
@@ -43,7 +43,7 @@ async def get_section(
         await service.close()
 
 
-@router.get("/genres", response_model=List[Genre])
+@router.get("/genres/", response_model=List[Genre])
 async def get_genres():
     """Return the merged list of movie and TV genres."""
     service = DiscoverService()

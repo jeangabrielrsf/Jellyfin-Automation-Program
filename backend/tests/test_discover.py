@@ -56,7 +56,7 @@ def mock_discover_http():
 async def test_get_sections_catalog_no_filters():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/api/discover/sections")
+        response = await client.get("/api/discover/sections/")
 
     assert response.status_code == 200
     data = response.json()
@@ -72,7 +72,7 @@ async def test_get_sections_catalog_no_filters():
 async def test_get_sections_catalog_filtered_omits_trending():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/api/discover/sections", params={"genre_id": 28})
+        response = await client.get("/api/discover/sections/", params={"genre_id": 28})
 
     assert response.status_code == 200
     data = response.json()
@@ -85,7 +85,7 @@ async def test_get_sections_catalog_filtered_omits_trending():
 async def test_get_sections_catalog_invalid_media_type():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/api/discover/sections", params={"media_type": "invalid"})
+        response = await client.get("/api/discover/sections/", params={"media_type": "invalid"})
 
     assert response.status_code == 422
 
@@ -94,7 +94,7 @@ async def test_get_sections_catalog_invalid_media_type():
 async def test_get_genres(mock_discover_http):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/api/discover/genres")
+        response = await client.get("/api/discover/genres/")
 
     assert response.status_code == 200
     data = response.json()
@@ -106,7 +106,7 @@ async def test_get_genres(mock_discover_http):
 async def test_get_section_not_found():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/api/discover/sections/nonexistent-section")
+        response = await client.get("/api/discover/sections/nonexistent-section/")
 
     assert response.status_code == 404
 
@@ -116,7 +116,7 @@ async def test_get_section_not_found():
 async def test_get_popular_movies_section():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/api/discover/sections/popular-movies")
+        response = await client.get("/api/discover/sections/popular-movies/")
 
     assert response.status_code == 200
     data = response.json()
@@ -130,7 +130,7 @@ async def test_get_popular_movies_section():
 async def test_sections_media_type_validation(mock_discover_http):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/api/discover/sections/popular-movies", params={"media_type": "movie"})
+        response = await client.get("/api/discover/sections/popular-movies/", params={"media_type": "movie"})
 
     assert response.status_code == 200
     data = response.json()
@@ -141,8 +141,8 @@ async def test_sections_media_type_validation(mock_discover_http):
 async def test_genres_consistent_across_requests(mock_discover_http):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response1 = await client.get("/api/discover/genres")
-        response2 = await client.get("/api/discover/genres")
+        response1 = await client.get("/api/discover/genres/")
+        response2 = await client.get("/api/discover/genres/")
 
     assert response1.status_code == 200
     assert response2.status_code == 200
@@ -156,7 +156,7 @@ async def test_genres_consistent_across_requests(mock_discover_http):
 async def test_anime_section_has_results():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/api/discover/sections/popular-animes")
+        response = await client.get("/api/discover/sections/popular-animes/")
 
     assert response.status_code == 200
     data = response.json()
@@ -199,7 +199,7 @@ async def test_trending_with_filters_returns_empty():
     """Trending section + filters should return empty results, not 404."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/api/discover/sections/trending", params={"genre_id": 28})
+        response = await client.get("/api/discover/sections/trending/", params={"genre_id": 28})
 
     assert response.status_code == 200
     data = response.json()
@@ -213,7 +213,7 @@ async def test_genre_section_returns_data():
     """Integration test: verify genre-action section works."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/api/discover/sections/genre-action")
+        response = await client.get("/api/discover/sections/genre-action/")
 
     assert response.status_code == 200
     data = response.json()
