@@ -1,10 +1,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Download, Settings, Home, FileText, Play } from 'lucide-react';
+import { Search, Download, Settings, Home, FileText, Play, Compass } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
 const navItems = [
   { path: '/', icon: Home, label: 'Início' },
+  { path: '/discover', icon: Compass, label: 'Explorar' },
   { path: '/search', icon: Search, label: 'Buscar' },
   { path: '/downloads', icon: Download, label: 'Downloads' },
   { path: '/settings', icon: Settings, label: 'Configurações' },

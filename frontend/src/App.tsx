@@ -6,6 +6,7 @@ import DetailPage from './pages/Detail';
 import DownloadsPage from './pages/Downloads';
 import SettingsPage from './pages/Settings';
 import LogsPage from './pages/Logs';
+import DiscoverPage from './pages/Discover';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />
+          <Route path="/discover" element={<DiscoverPage />} />
           <Route path="/detail/:mediaType/:id" element={<DetailPage />} />
           <Route path="/downloads" element={<DownloadsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
