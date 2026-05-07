@@ -85,3 +85,25 @@ export interface AppSettings {
   jellyfin_url: string;
   log_level: string;
 }
+
+export interface DiscoverParams {
+  genre_id?: number | null
+  media_type?: string | null
+  sort_by?: string
+}
+
+export interface SectionInfo {
+  id: string
+  title: string
+  media_type: string
+}
+
+export interface DiscoverSection extends SectionInfo {
+  results: TMDBSearchResult[]
+  total_results: number
+}
+
+export interface Genre {
+  id: number
+  name: string
+}
