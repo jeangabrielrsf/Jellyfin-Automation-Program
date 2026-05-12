@@ -10,6 +10,7 @@ class DiscoverParams(BaseModel):
     genre_id: Optional[int] = None
     media_type: Optional[str] = None  # "movie" | "series" | "anime"
     sort_by: str = "popularity.desc"
+    watch_provider_id: Optional[int] = None
 
 
 class SectionInfo(BaseModel):
@@ -33,3 +34,9 @@ class DiscoverSection(BaseModel):
 class Genre(BaseModel):
     id: int
     name: str
+
+
+class StreamingProvider(BaseModel):
+    id: int
+    name: str
+    logo_path: Optional[str] = None
