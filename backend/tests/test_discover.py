@@ -179,6 +179,11 @@ class TestDiscoverParams:
         assert p.media_type == "movie"
         assert p.sort_by == "vote_average.desc"
 
+    def test_with_watch_provider(self):
+        p = DiscoverParams(watch_provider_id=8)
+        assert p.watch_provider_id == 8
+        assert p.genre_id is None
+
 
 class TestSectionInfo:
     def test_model(self):
@@ -220,3 +225,54 @@ async def test_genre_section_returns_data():
     section = DiscoverSection(**data)
     assert section.id == "genre-action"
     assert isinstance(section.results, list)
+
+
+@pytest.mark.anyio
+async def test_get_providers():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/api/discover/providers/")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) == 7
+    provider_ids = [p["id"] for p in data]
+    assert 8 in provider_ids  # Netflix
+    assert 119 in provider_ids  # Amazon
+    assert 337 in provider_ids  # Disney+
+    for p in data:
+        assert "id" in p
+        assert "name" in p
+
+
+@pytest.mark.anyio
+async def test_get_sections_catalog_with_streaming_omits_incompatible():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/api/discover/sections/", params={"watch_provider_id": 8})
+
+    assert response.status_code == 200
+    data = response.json()
+    section_ids = [s["id"] for s in data["sections"]]
+    assert "trending" not in section_ids
+    assert "now-playing" not in section_ids
+    assert "upcoming" not in section_ids
+    assert "popular-movies" in section_ids
+    assert "popular-series" in section_ids
+    assert len(data["sections"]) == 10
+
+
+@pytest.mark.anyio
+async def test_section_with_watch_provider_uses_discover(mock_discover_http):
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get(
+            "/api/discover/sections/popular-movies/",
+            params={"watch_provider_id": 8}
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == "popular-movies"
+    assert len(data["results"]) > 0
