@@ -20,7 +20,9 @@ class JackettScraper(BaseScraper):
     
     def __init__(self):
         self.settings = get_settings()
-        self.client = httpx.AsyncClient(timeout=httpx.Timeout(10.0, read=30.0))
+        self.client = httpx.AsyncClient(
+            timeout=httpx.Timeout(10.0, read=float(self.settings.jackett_timeout))
+        )
     
     async def search(self, query: str, media_type: str, quality: str = "1080p", language: str = "legendado") -> List[TorrentResult]:
         """Search for torrents via Jackett."""
@@ -82,7 +84,7 @@ class JackettScraper(BaseScraper):
             logger.error(
                 "Jackett request timed out — the service may be overloaded or unreachable",
                 url=self.settings.jackett_url,
-                timeout=60,
+                timeout=self.settings.jackett_timeout,
                 error=str(e)
             )
             return []

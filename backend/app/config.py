@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     # Jackett
     jackett_url: str = Field(default="http://localhost:9117")
     jackett_api_key: str = Field(default="")
+    jackett_timeout: int = Field(default=120)
     
     # Jellyfin
     jellyfin_url: str = Field(default="http://localhost:8096")
