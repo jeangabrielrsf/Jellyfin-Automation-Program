@@ -9,6 +9,7 @@ from app.models.discover import (
     SectionCatalog,
     DiscoverSection,
     Genre,
+    StreamingProvider,
 )
 from app.models.tmdb import TMDBSearchResult
 from app.logging_config import get_logger
@@ -135,6 +136,11 @@ class DiscoverService:
 
             url = f"{self.BASE_URL}/discover/{media}"
             query: dict = {**common, "sort_by": params.sort_by}
+
+            # Streaming provider
+            if params.watch_provider_id:
+                query["with_watch_providers"] = str(params.watch_provider_id)
+                query["watch_region"] = "BR"
 
             # Genre
             if section_id.startswith("genre-"):
