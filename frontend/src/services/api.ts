@@ -104,15 +104,19 @@ export const discoverAPI = {
     genre_id?: number | null;
     media_type?: string | null;
     sort_by?: string;
+    watch_provider_id?: number | null;
   }) => api.get('/discover/sections/', { params }),
 
   getSection: (id: string, params?: {
     genre_id?: number | null;
     media_type?: string | null;
     sort_by?: string;
+    watch_provider_id?: number | null;
   }) => api.get(`/discover/sections/${id}/`, { params }),
 
   getGenres: () => api.get('/discover/genres/'),
+
+  getProviders: () => api.get<Array<{ id: number; name: string; logo_path: string | null }>>('/discover/providers/'),
 };
 
 export default api;
