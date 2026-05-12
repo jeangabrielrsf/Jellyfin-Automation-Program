@@ -69,6 +69,8 @@ class DiscoverService:
         """Close the HTTP client."""
         await self.client.aclose()
 
+    STREAMING_INCOMPATIBLE_SECTIONS = {"now-playing", "upcoming", "trending"}
+
     def _filters_active(self, params: DiscoverParams) -> bool:
         return params.genre_id is not None or params.media_type is not None or params.watch_provider_id is not None
 
@@ -77,7 +79,9 @@ class DiscoverService:
 
     def get_sections_catalog(self, params: DiscoverParams) -> SectionCatalog:
         sections = list(SECTION_DEFS)
-        if self._filters_active(params):
+        if params.watch_provider_id:
+            sections = [s for s in sections if s.id not in self.STREAMING_INCOMPATIBLE_SECTIONS]
+        elif self._filters_active(params):
             sections = [s for s in sections if s.id != "trending"]
         return SectionCatalog(sections=sections)
 
