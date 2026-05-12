@@ -52,6 +52,8 @@ services:
     stop_grace_period: 10s
     ports:
       - "3001:80"
+    extra_hosts:
+      - "backend-host:host-gateway"
     depends_on:
       - backend
 
