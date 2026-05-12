@@ -10,11 +10,12 @@ const DiscoverPage: React.FC = () => {
   const [genreId, setGenreId] = useState<number | null>(null);
   const [mediaType, setMediaType] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState('popularity.desc');
+  const [watchProviderId, setWatchProviderId] = useState<number | null>(null);
 
-  const filters: DiscoverParams = { genre_id: genreId, media_type: mediaType, sort_by: sortBy };
+  const filters: DiscoverParams = { genre_id: genreId, media_type: mediaType, sort_by: sortBy, watch_provider_id: watchProviderId };
 
   const { data: catalog, isLoading: catalogLoading, isError: catalogError } = useQuery({
-    queryKey: ['discover', 'sections'],
+    queryKey: ['discover', 'sections', filters],
     queryFn: async () => {
       const res = await discoverAPI.getSections(filters);
       return res.data;
@@ -25,6 +26,15 @@ const DiscoverPage: React.FC = () => {
     queryKey: ['discover', 'genres'],
     queryFn: async () => {
       const res = await discoverAPI.getGenres();
+      return res.data;
+    },
+    staleTime: 60 * 60 * 1000,
+  });
+
+  const { data: providers } = useQuery({
+    queryKey: ['discover', 'providers'],
+    queryFn: async () => {
+      const res = await discoverAPI.getProviders();
       return res.data;
     },
     staleTime: 60 * 60 * 1000,
@@ -49,10 +59,13 @@ const DiscoverPage: React.FC = () => {
       <DiscoverFilterBar
         genreId={genreId}
         mediaType={mediaType}
+        watchProviderId={watchProviderId}
         sortBy={sortBy}
         genres={genres ?? []}
+        providers={providers ?? []}
         onGenreChange={setGenreId}
         onMediaTypeChange={setMediaType}
+        onWatchProviderChange={setWatchProviderId}
         onSortChange={setSortBy}
       />
 
