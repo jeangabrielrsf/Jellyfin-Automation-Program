@@ -90,6 +90,7 @@ export interface DiscoverParams {
   genre_id?: number | null
   media_type?: string | null
   sort_by?: string
+  watch_provider_id?: number | null
 }
 
 export interface SectionInfo {
@@ -106,4 +107,10 @@ export interface DiscoverSection extends SectionInfo {
 export interface Genre {
   id: number
   name: string
+}
+
+export interface StreamingProvider {
+  id: number
+  name: string
+  logo_path: string | null
 }
