@@ -1,6 +1,6 @@
 import React from 'react';
 import { Select, SelectItem } from './ui/select';
-import { Genre } from '../types';
+import { Genre, StreamingProvider } from '../types';
 
 const CONTENT_TYPES = [
   { value: '', label: 'Todos' },
@@ -18,20 +18,26 @@ const SORT_OPTIONS = [
 interface DiscoverFilterBarProps {
   genreId: number | null;
   mediaType: string | null;
+  watchProviderId: number | null;
   sortBy: string;
   genres: Genre[];
+  providers: StreamingProvider[];
   onGenreChange: (genreId: number | null) => void;
   onMediaTypeChange: (mediaType: string | null) => void;
+  onWatchProviderChange: (providerId: number | null) => void;
   onSortChange: (sortBy: string) => void;
 }
 
 export const DiscoverFilterBar: React.FC<DiscoverFilterBarProps> = ({
   genreId,
   mediaType,
+  watchProviderId,
   sortBy,
   genres,
+  providers,
   onGenreChange,
   onMediaTypeChange,
+  onWatchProviderChange,
   onSortChange,
 }) => {
   return (
@@ -63,6 +69,22 @@ export const DiscoverFilterBar: React.FC<DiscoverFilterBarProps> = ({
         {CONTENT_TYPES.map((ct) => (
           <SelectItem key={ct.value} value={ct.value}>
             {ct.label}
+          </SelectItem>
+        ))}
+      </Select>
+
+      <Select
+        value={watchProviderId ?? ''}
+        onChange={(e) => {
+          const val = e.target.value;
+          onWatchProviderChange(val ? Number(val) : null);
+        }}
+        className="w-48"
+      >
+        <SelectItem value="">Todos os streamings</SelectItem>
+        {providers.map((p) => (
+          <SelectItem key={p.id} value={String(p.id)}>
+            {p.name}
           </SelectItem>
         ))}
       </Select>
