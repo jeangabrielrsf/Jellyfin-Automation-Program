@@ -20,7 +20,7 @@ class JackettScraper(BaseScraper):
     
     def __init__(self):
         self.settings = get_settings()
-        self.client = httpx.AsyncClient(timeout=60.0)
+        self.client = httpx.AsyncClient(timeout=httpx.Timeout(10.0, read=30.0))
     
     async def search(self, query: str, media_type: str, quality: str = "1080p", language: str = "legendado") -> List[TorrentResult]:
         """Search for torrents via Jackett."""
