@@ -41,6 +41,16 @@ GENRE_SECTION_IDS = {
 
 ANIME_GENRE_ID = 16
 
+STREAMING_PROVIDERS = [
+    {"id": 8, "name": "Netflix", "logo_path": None},
+    {"id": 119, "name": "Amazon Prime Video", "logo_path": None},
+    {"id": 337, "name": "Disney+", "logo_path": None},
+    {"id": 384, "name": "HBO Max", "logo_path": None},
+    {"id": 350, "name": "Apple TV+", "logo_path": None},
+    {"id": 307, "name": "Globoplay", "logo_path": None},
+    {"id": 531, "name": "Paramount+", "logo_path": None},
+]
+
 
 class DiscoverService:
     BASE_URL = "https://api.themoviedb.org/3"
@@ -59,10 +69,10 @@ class DiscoverService:
         await self.client.aclose()
 
     def _filters_active(self, params: DiscoverParams) -> bool:
-        return params.genre_id is not None or params.media_type is not None
+        return params.genre_id is not None or params.media_type is not None or params.watch_provider_id is not None
 
     def _cache_key(self, section_id: str, params: DiscoverParams) -> str:
-        return f"{section_id}:{params.genre_id}:{params.media_type}:{params.sort_by}"
+        return f"{section_id}:{params.genre_id}:{params.media_type}:{params.sort_by}:{params.watch_provider_id}"
 
     def get_sections_catalog(self, params: DiscoverParams) -> SectionCatalog:
         sections = list(SECTION_DEFS)
