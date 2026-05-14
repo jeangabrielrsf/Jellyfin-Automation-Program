@@ -7,7 +7,6 @@ from app.database import get_db
 from app.models.download import Download, DownloadStatus, ContentType
 from app.services.qbittorrent_service import QBittorrentService
 from app.services.path_resolver import PathResolver
-from app.services.path_converter import is_wsl2, wsl_to_windows
 from app.logging_config import get_logger
 from pydantic import BaseModel
 
@@ -114,13 +113,9 @@ async def create_download(
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error")
     
-    # Convert save_path for qBittorrent if running in WSL2
-    # WSL2 paths (/mnt/d/...) need to be converted to Windows format (D:\...) for qBittorrent on Windows
+    # qBittorrent runs in Docker (Linux container), so WSL paths (/mnt/d/...)
+    # work as-is — no Windows path conversion needed.
     qb_save_path = save_path
-    if is_wsl2():
-        qb_save_path = wsl_to_windows(save_path)
-        if qb_save_path != save_path:
-            logger.info("Converted save path for qBittorrent", original=save_path, converted=qb_save_path)
 
     # Try to add torrent to qBittorrent immediately
     logger.info("Creating download", magnet_link=magnet_link, download_url=download_url, torrent_name=download.torrent_name)

@@ -70,6 +70,9 @@ services:
     volumes:
       - ./qbittorrent/config:/config
       - ${TORRENTS_PATH:-/mnt/d/Torrents}:/downloads
+      - ${MOVIES_PATH:-/mnt/d/Filmes}:${MOVIES_PATH:-/mnt/d/Filmes}
+      - ${SERIES_PATH:-/mnt/d/Séries}:${SERIES_PATH:-/mnt/d/Séries}
+      - ${ANIMES_PATH:-/mnt/d/Animes}:${ANIMES_PATH:-/mnt/d/Animes}
     ports:
       - "8082:8080"
       - "6881:6881"
