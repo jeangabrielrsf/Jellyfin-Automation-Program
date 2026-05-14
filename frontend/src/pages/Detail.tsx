@@ -193,6 +193,21 @@ const DetailPage: React.FC = () => {
             <p className="text-sm text-muted-foreground mt-2 line-clamp-3">
               {media.overview}
             </p>
+            {media.rt_rating && (
+              <div className="flex items-center gap-2 mt-3">
+                <span className="text-lg">
+                  {parseInt(media.rt_rating) >= 60 ? '🍅' : '💀'}
+                </span>
+                <a
+                  href={media.rt_url || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-white/80 hover:text-white underline underline-offset-2 transition-colors"
+                >
+                  {media.rt_rating} no Rotten Tomatoes
+                </a>
+              </div>
+            )}
           </div>
         </div>
       </div>
