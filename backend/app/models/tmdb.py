@@ -55,6 +55,10 @@ class TMDBDetail(BaseModel):
     number_of_episodes: Optional[int] = None
     status: Optional[str] = None
     tagline: Optional[str] = None
+    external_ids: Optional[dict] = None
+    imdb_id: Optional[str] = None
+    rt_rating: Optional[str] = None
+    rt_url: Optional[str] = None
     seasons: List[dict] = []
     
     @computed_field
