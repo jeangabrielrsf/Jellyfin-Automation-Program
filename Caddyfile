@@ -1,3 +1,3 @@
-jellyfin.local {
+:80 {
     reverse_proxy frontend:80
 }

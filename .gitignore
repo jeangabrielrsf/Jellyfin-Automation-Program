@@ -11,4 +11,3 @@ logs/
 *.log
 jackett/config/
 qbittorrent/config/
-adguard/
