@@ -27,6 +27,7 @@ services:
     environment:
       DATABASE_URL: postgresql://jfa_user:jfa_password@localhost:5432/jellyfin_automation
       TMDB_API_KEY: ${TMDB_API_KEY:-}
+      OMDB_API_KEY: ${OMDB_API_KEY:-}
       JACKETT_URL: ${JACKETT_URL:-http://localhost:9117}
       JACKETT_API_KEY: ${JACKETT_API_KEY:-}
       QBITTORRENT_HOST: ${QBITTORRENT_HOST:-http://localhost:8080}
