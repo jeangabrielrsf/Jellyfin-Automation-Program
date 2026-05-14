@@ -17,13 +17,12 @@ Hybrid approach (C): targeted fixes for critical issues + useful new functionali
 **Problem:** 6 nav icons + theme toggle + avatar overflow the ~360px viewport. Theme toggle and avatar are not visible at all on S23.
 
 **Solution:**
-- On mobile (<768px / `md` breakpoint): show only the logo icon and a hamburger menu button
+- On mobile (<768px / `md` breakpoint): show the logo icon + app title "Jellyfin Automation" + hamburger menu button
 - Hamburger opens a dropdown/drawer (using shadcn `Sheet` component) containing:
   - All 6 navigation links (with icons + labels)
   - Theme toggle
   - Avatar "JA"
 - On desktop (≥768px): keep current layout unchanged
-- Logo text "Jellyfin Automation" stays `hidden sm:block` (already is)
 
 **New dependency:** `npx shadcn@latest add sheet` for the mobile drawer.
 
