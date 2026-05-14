@@ -20,20 +20,21 @@ services:
 
   backend:
     build: ./backend
-    network_mode: "host"
     restart: always
     init: true
     stop_grace_period: 10s
+    ports:
+      - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://jfa_user:jfa_password@localhost:5432/jellyfin_automation
+      DATABASE_URL: postgresql://jfa_user:jfa_password@db:5432/jellyfin_automation
       TMDB_API_KEY: ${TMDB_API_KEY:-}
       OMDB_API_KEY: ${OMDB_API_KEY:-}
-      JACKETT_URL: ${JACKETT_URL:-http://localhost:9117}
+      JACKETT_URL: ${JACKETT_URL:-http://jackett:9117}
       JACKETT_API_KEY: ${JACKETT_API_KEY:-}
-      QBITTORRENT_HOST: ${QBITTORRENT_HOST:-http://localhost:8080}
-      QBITTORRENT_USERNAME: ${QBITTORRENT_USERNAME:-jeanfrusca}
-      QBITTORRENT_PASSWORD: ${QBITTORRENT_PASSWORD:-VamosCodar!96}
-      JELLYFIN_URL: ${JELLYFIN_URL:-http://localhost:8096}
+      QBITTORRENT_HOST: ${QBITTORRENT_HOST:-http://qbittorrent:8080}
+      QBITTORRENT_USERNAME: ${QBITTORRENT_USERNAME:-admin}
+      QBITTORRENT_PASSWORD: ${QBITTORRENT_PASSWORD:-adminadmin}
+      JELLYFIN_URL: ${JELLYFIN_URL:-http://host.docker.internal:8096}
       JELLYFIN_API_KEY: ${JELLYFIN_API_KEY:-}
       MOVIES_PATH: ${MOVIES_PATH:-/mnt/d/Filmes}
       SERIES_PATH: ${SERIES_PATH:-/mnt/d/Séries}
@@ -45,6 +46,8 @@ services:
     volumes:
       - /mnt:/mnt
       - ./backend/logs:/app/logs
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   frontend:
     restart: always
@@ -53,10 +56,37 @@ services:
     stop_grace_period: 10s
     ports:
       - "3001:80"
-    extra_hosts:
-      - "backend-host:host-gateway"
     depends_on:
       - backend
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    restart: always
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - WEBUI_PORT=8080
+      - TZ=America/Sao_Paulo
+    volumes:
+      - ./qbittorrent/config:/config
+      - ${TORRENTS_PATH:-/mnt/d/Torrents}:/downloads
+    ports:
+      - "8080:8080"
+      - "6881:6881"
+      - "6881:6881/udp"
+
+  jackett:
+    image: lscr.io/linuxserver/jackett:latest
+    restart: always
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Sao_Paulo
+    volumes:
+      - ./jackett/config:/config
+      - ${TORRENTS_PATH:-/mnt/d/Torrents}:/downloads
+    ports:
+      - "9117:9117"
 
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:latest

@@ -3,9 +3,8 @@ import re
 from typing import Optional, Dict
 from pathlib import Path
 from sqlalchemy.orm import Session
-from app.config import get_settings
+from app.services.config_service import get_config
 from app.logging_config import get_logger
-from app.services.settings_service import get_media_paths
 from app.services.path_converter import is_wsl2, windows_to_wsl
 
 logger = get_logger(__name__)
@@ -58,15 +57,13 @@ class PathResolver:
             Absolute path where the torrent should be saved
         """
         if db:
-            paths = get_media_paths(db)
-            movies_path = paths["movies_path"]
-            series_path = paths["series_path"]
-            animes_path = paths["animes_path"]
+            movies_path = get_config("movies_path", db, required=True)
+            series_path = get_config("series_path", db, required=True)
+            animes_path = get_config("animes_path", db, required=True)
         else:
-            settings = get_settings()
-            movies_path = settings.movies_path
-            series_path = settings.series_path
-            animes_path = settings.animes_path
+            movies_path = get_config("movies_path", required=True)
+            series_path = get_config("series_path", required=True)
+            animes_path = get_config("animes_path", required=True)
 
         movies_path = self._validate_base_path(movies_path, "movies_path")
         series_path = self._validate_base_path(series_path, "series_path")

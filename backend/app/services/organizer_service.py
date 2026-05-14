@@ -4,10 +4,9 @@ import shutil
 import re
 from pathlib import Path
 from typing import Optional, List
-from app.config import get_settings
+from app.services.config_service import get_config
 from app.logging_config import get_logger
 from sqlalchemy.orm import Session
-from app.services.settings_service import get_media_paths
 
 logger = get_logger(__name__)
 
@@ -18,16 +17,9 @@ class OrganizerService:
     SUBTITLE_EXTENSIONS = {'.srt', '.ass', '.ssa', '.sub', '.idx'}
 
     def __init__(self, db: Optional[Session] = None):
-        if db:
-            paths = get_media_paths(db)
-            self.movies_path = paths["movies_path"]
-            self.series_path = paths["series_path"]
-            self.animes_path = paths["animes_path"]
-        else:
-            settings = get_settings()
-            self.movies_path = settings.movies_path
-            self.series_path = settings.series_path
-            self.animes_path = settings.animes_path
+        self.movies_path = get_config("movies_path", db, required=True)
+        self.series_path = get_config("series_path", db, required=True)
+        self.animes_path = get_config("animes_path", db, required=True)
 
     async def organize_movie(self, source_path: str, title: str, year: Optional[int], quality: str) -> str:
         """Organize a movie file."""

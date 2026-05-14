@@ -124,8 +124,9 @@ async def create_download(
 
     # Try to add torrent to qBittorrent immediately
     logger.info("Creating download", magnet_link=magnet_link, download_url=download_url, torrent_name=download.torrent_name)
-    service = QBittorrentService()
+    service = QBittorrentService(db=db)
     try:
+        ...
         # Tag única para identificar o torrent no qBittorrent
         tag = f"jellyfin-auto-{db_download.id}"
         success = await service.add_torrent(
@@ -217,7 +218,7 @@ async def pause_download(download_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="No torrent hash associated with this download")
     
     from app.services.qbittorrent_service import QBittorrentService
-    service = QBittorrentService()
+    service = QBittorrentService(db=db)
     success = await service.pause_torrent(download.torrent_hash)
     await service.close()
     
@@ -237,7 +238,7 @@ async def resume_download(download_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="No torrent hash associated with this download")
     
     from app.services.qbittorrent_service import QBittorrentService
-    service = QBittorrentService()
+    service = QBittorrentService(db=db)
     success = await service.resume_torrent(download.torrent_hash)
     await service.close()
     
@@ -262,7 +263,7 @@ async def delete_all_downloads(db: Session = Depends(get_db)):
     ).all()
     
     # Remove torrents from qBittorrent (keep files)
-    service = QBittorrentService()
+    service = QBittorrentService(db=db)
     for download in removable:
         if download.torrent_hash:
             try:

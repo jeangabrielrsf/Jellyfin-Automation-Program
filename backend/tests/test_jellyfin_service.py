@@ -1,12 +1,16 @@
 """Tests for Jellyfin service."""
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from app.models.settings import Setting
 from app.services.jellyfin_service import JellyfinService
 
 
 @pytest.fixture
-def jellyfin_service():
-    return JellyfinService()
+def jellyfin_service(db_session):
+    db_session.add(Setting(key="jellyfin_url", value="http://localhost:8096"))
+    db_session.add(Setting(key="jellyfin_api_key", value="test-api-key"))
+    db_session.commit()
+    return JellyfinService(db=db_session)
 
 
 def _mock_response(json_data=None, status_code=200):

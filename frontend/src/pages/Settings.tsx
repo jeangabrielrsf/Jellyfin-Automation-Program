@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Folder, Sparkles, Save } from 'lucide-react';
+import { Folder, Sparkles, Save, Eye, EyeOff, Server } from 'lucide-react';
 import { settingsAPI } from '../services/api';
 import { Button } from '@/components/ui/button';
 import FolderPickerDialog from '@/components/FolderPickerDialog';
@@ -25,12 +25,41 @@ const settingGroups = [
       { key: 'default_language', label: 'Idioma Padrão', placeholder: 'legendado' },
     ],
   },
+  {
+    icon: Server,
+    title: 'Serviços Externos',
+    description: 'Configuração de APIs e serviços externos',
+    settings: [
+      { key: 'tmdb_api_key', label: 'TMDB API Key', placeholder: 'Sua chave do TMDB', sensitive: true },
+      { key: 'omdb_api_key', label: 'OMDB API Key', placeholder: 'Sua chave do OMDB', sensitive: true },
+      { key: 'jackett_url', label: 'Jackett URL', placeholder: 'http://jackett:9117' },
+      { key: 'jackett_api_key', label: 'Jackett API Key', placeholder: 'Sua chave do Jackett', sensitive: true },
+      { key: 'qbittorrent_host', label: 'qBittorrent Host', placeholder: 'http://qbittorrent:8080' },
+      { key: 'qbittorrent_username', label: 'qBittorrent Username', placeholder: 'admin' },
+      { key: 'qbittorrent_password', label: 'qBittorrent Password', placeholder: 'Senha do qBittorrent', sensitive: true, type: 'password' },
+      { key: 'jellyfin_url', label: 'Jellyfin URL', placeholder: 'http://host.docker.internal:8096' },
+      { key: 'jellyfin_api_key', label: 'Jellyfin API Key', placeholder: 'Sua chave do Jellyfin', sensitive: true },
+    ],
+  },
 ];
 
 const SettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [pickerOpen, setPickerOpen] = useState<string | null>(null);
   const [pathValues, setPathValues] = useState<Record<string, string>>({});
+  const [visibleFields, setVisibleFields] = useState<Set<string>>(new Set());
+
+  const toggleVisibility = (key: string) => {
+    setVisibleFields((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   const { data: currentSettings, isLoading } = useQuery({
     queryKey: ['settings'],
@@ -41,23 +70,9 @@ const SettingsPage: React.FC = () => {
 
   useEffect(() => {
     if (currentSettings?.data) {
-      const newValues = {
-        movies_path: currentSettings.data.movies_path || '',
-        series_path: currentSettings.data.series_path || '',
-        animes_path: currentSettings.data.animes_path || '',
-      };
-      setPathValues((prev) => {
-        if (
-          prev.movies_path === newValues.movies_path &&
-          prev.series_path === newValues.series_path &&
-          prev.animes_path === newValues.animes_path
-        ) {
-          return prev;
-        }
-        return { ...prev, ...newValues };
-      });
+      setPathValues((prev) => ({ ...prev, ...currentSettings.data }));
     }
-  }, [currentSettings?.data?.movies_path, currentSettings?.data?.series_path, currentSettings?.data?.animes_path]);
+  }, [currentSettings?.data]);
 
   const updateMutation = useMutation({
     mutationFn: ({ key, value }: { key: string; value: string }) =>
@@ -164,31 +179,44 @@ const SettingsPage: React.FC = () => {
                         <option value="dublado">Dublado</option>
                       </select>
                     ) : (
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <input
-                          type="text"
-                          value={pathValues[setting.key] ?? currentValues[setting.key] ?? ''}
-                          placeholder={setting.placeholder}
-                          onChange={(e) => setPathValues((prev) => ({ ...prev, [setting.key]: e.target.value }))}
-                          onBlur={(e) => handleUpdate(setting.key, e.target.value)}
-                          className="flex-1 px-4 py-3 rounded-xl glass bg-transparent
-                                   border border-border/50
-                                   focus:outline-none focus:ring-2 focus:ring-primary/30
-                                   focus:border-primary/30
-                                   text-foreground placeholder:text-muted-foreground/50
-                                   font-mono text-sm
-                                   transition-all duration-200"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="default"
-                          className="shrink-0 sm:w-auto w-full"
-                          onClick={() => setPickerOpen(setting.key)}
-                        >
-                          <Folder className="w-4 h-4 mr-1" />
-                          Browse
-                        </Button>
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <input
+                            type={(setting as any).sensitive && !visibleFields.has(setting.key) ? 'password' : ((setting as any).type || 'text')}
+                            value={pathValues[setting.key] ?? currentValues[setting.key] ?? ''}
+                            placeholder={setting.placeholder}
+                            onChange={(e) => setPathValues((prev) => ({ ...prev, [setting.key]: e.target.value }))}
+                            onBlur={(e) => handleUpdate(setting.key, e.target.value)}
+                            className="flex-1 px-4 py-3 rounded-xl glass bg-transparent
+                                     border border-border/50
+                                     focus:outline-none focus:ring-2 focus:ring-primary/30
+                                     focus:border-primary/30
+                                     text-foreground placeholder:text-muted-foreground/50
+                                     font-mono text-sm
+                                     transition-all duration-200"
+                          />
+                          {(setting as any).sensitive ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleVisibility(setting.key)}
+                              className="px-3 py-3 rounded-xl glass border border-border/50
+                                       hover:bg-primary/10 transition-colors"
+                            >
+                              {visibleFields.has(setting.key) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="default"
+                              className="shrink-0"
+                              onClick={() => setPickerOpen(setting.key)}
+                            >
+                              <Folder className="w-4 h-4 mr-1" />
+                              Browse
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     )}
                     {updateMutation.isPending && updateMutation.variables?.key === setting.key && (

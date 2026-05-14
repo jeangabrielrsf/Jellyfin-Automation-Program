@@ -34,9 +34,9 @@ def test_extract_season_episode_season_x_episode_y_format(resolver):
 
 
 def test_resolve_series_path(resolver):
-    with patch("app.services.path_resolver.get_settings") as mock_settings, \
+    with patch("app.services.path_resolver.get_config") as mock_get_config, \
          patch("pathlib.Path.mkdir"):
-        mock_settings.return_value.series_path = "/series"
+        mock_get_config.return_value = "/series"
         result = resolver.resolve_path(
             title="Breaking Bad",
             media_type="series",
@@ -48,9 +48,9 @@ def test_resolve_series_path(resolver):
 
 
 def test_resolve_movie_path(resolver):
-    with patch("app.services.path_resolver.get_settings") as mock_settings, \
+    with patch("app.services.path_resolver.get_config") as mock_get_config, \
          patch("pathlib.Path.mkdir"):
-        mock_settings.return_value.movies_path = "/movies"
+        mock_get_config.return_value = "/movies"
         result = resolver.resolve_path(
             title="Inception",
             media_type="movie",
@@ -61,9 +61,9 @@ def test_resolve_movie_path(resolver):
 
 
 def test_resolve_anime_path(resolver):
-    with patch("app.services.path_resolver.get_settings") as mock_settings, \
+    with patch("app.services.path_resolver.get_config") as mock_get_config, \
          patch("pathlib.Path.mkdir"):
-        mock_settings.return_value.animes_path = "/animes"
+        mock_get_config.return_value = "/animes"
         result = resolver.resolve_path(
             title="Attack on Titan",
             media_type="anime",
@@ -75,9 +75,9 @@ def test_resolve_anime_path(resolver):
 
 
 def test_resolve_invalid_media_type_raises_value_error(resolver):
-    with patch("app.services.path_resolver.get_settings") as mock_settings, \
+    with patch("app.services.path_resolver.get_config") as mock_get_config, \
          patch("pathlib.Path.mkdir"):
-        mock_settings.return_value.movies_path = "/movies"
+        mock_get_config.return_value = "/movies"
         with pytest.raises(ValueError, match="Unknown media type: invalid"):
             resolver.resolve_path(
                 title="Some Title",
@@ -86,9 +86,9 @@ def test_resolve_invalid_media_type_raises_value_error(resolver):
 
 
 def test_resolve_path_with_special_characters_in_title(resolver):
-    with patch("app.services.path_resolver.get_settings") as mock_settings, \
+    with patch("app.services.path_resolver.get_config") as mock_get_config, \
          patch("pathlib.Path.mkdir"):
-        mock_settings.return_value.movies_path = "/movies"
+        mock_get_config.return_value = "/movies"
         result = resolver.resolve_path(
             title="Movie: The Special <Edition> \"Remastered\"",
             media_type="movie",

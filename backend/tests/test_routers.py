@@ -17,7 +17,15 @@ def test_health_check(client):
 class TestSearchRouter:
     """Tests for search endpoints."""
 
-    def test_search_media(self, client):
+    @pytest.fixture
+    def search_settings(self, db_session):
+        """Populate settings needed by TMDBService and JackettScraper."""
+        db_session.add(Setting(key="tmdb_api_key", value="test-key"))
+        db_session.add(Setting(key="jackett_url", value="http://localhost:9117"))
+        db_session.add(Setting(key="jackett_api_key", value="test-api-key"))
+        db_session.commit()
+
+    def test_search_media(self, client, search_settings):
         """Test TMDB search endpoint."""
         mock_response = {
             "page": 1,
@@ -45,7 +53,7 @@ class TestSearchRouter:
             data = response.json()
             assert data["results"][0]["title"] == "Test Movie"
 
-    def test_get_movie_detail(self, client):
+    def test_get_movie_detail(self, client, search_settings):
         """Test movie detail endpoint."""
         mock_detail = {
             "id": 1,
@@ -64,7 +72,7 @@ class TestSearchRouter:
             data = response.json()
             assert data["title"] == "Test Movie"
 
-    def test_get_tv_detail(self, client):
+    def test_get_tv_detail(self, client, search_settings):
         """Test TV detail endpoint."""
         mock_detail = {
             "id": 1,
@@ -83,7 +91,7 @@ class TestSearchRouter:
             data = response.json()
             assert data["name"] == "Test Show"
 
-    def test_search_torrents(self, client):
+    def test_search_torrents(self, client, search_settings):
         """Test torrent search endpoint with TMDB lookup."""
         from app.models.tmdb import TMDBDetail
         from app.models.torrent import TorrentResult
@@ -122,7 +130,7 @@ class TestSearchRouter:
                 assert len(data) == 1
                 assert data[0]["title"] == "Test"
 
-    def test_get_tv_seasons(self, client):
+    def test_get_tv_seasons(self, client, search_settings):
         """Test TV seasons endpoint."""
         from app.models.tmdb import TMDBDetail
         mock_detail = TMDBDetail(

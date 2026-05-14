@@ -8,7 +8,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.database import init_db
+from app.database import init_db, SessionLocal
 from app.logging_config import setup_logging
 from app.routers import search, downloads, settings, logs, filesystem, discover
 from app.services.download_worker import DownloadWorker
@@ -55,12 +55,46 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
+def _seed_config_from_env(db) -> None:
+    """Populate DB with .env values if keys are missing."""
+    from app.config import get_settings
+    from app.models.settings import Setting
+
+    env = get_settings()
+    critical_keys = [
+        "tmdb_api_key", "omdb_api_key",
+        "jackett_url", "jackett_api_key", "jackett_timeout",
+        "qbittorrent_host", "qbittorrent_username", "qbittorrent_password",
+        "jellyfin_url", "jellyfin_api_key",
+        "movies_path", "series_path", "animes_path",
+        "default_quality", "default_language",
+    ]
+    seeded = 0
+    for key in critical_keys:
+        existing = db.query(Setting).filter(Setting.key == key).first()
+        if not existing:
+            env_value = getattr(env, key, None)
+            if env_value:
+                db.add(Setting(key=key, value=env_value))
+                seeded += 1
+    if seeded:
+        db.commit()
+        logger.info("Seeded configuration from .env to DB", count=seeded)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> None:
     """Handle application startup and shutdown events."""
     logger.info("Starting up Jellyfin Automation")
     await asyncio.to_thread(init_db)
-    
+
+    # Seed config from .env if DB is empty
+    db = SessionLocal()
+    try:
+        _seed_config_from_env(db)
+    finally:
+        db.close()
+
     # Start DownloadWorker background task
     download_worker = DownloadWorker(broadcast_callback=manager.broadcast)
     worker_task = asyncio.create_task(download_worker.start())

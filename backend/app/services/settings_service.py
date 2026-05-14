@@ -1,15 +1,12 @@
-"""Settings service for reading runtime settings from DB with .env fallback."""
+"""Settings service — DEPRECATED: use config_service.get_config() instead."""
 from sqlalchemy.orm import Session
-from app.config import get_settings
-from app.models.settings import Setting
+from app.services.config_service import get_config
 
 
 def get_media_paths(db: Session) -> dict:
-    """Get media paths from DB settings, falling back to .env values."""
-    db_settings = {s.key: s.value for s in db.query(Setting).all()}
-    env = get_settings()
+    """DEPRECATED: Use get_config() for individual path keys instead."""
     return {
-        "movies_path": db_settings.get("movies_path") or env.movies_path,
-        "series_path": db_settings.get("series_path") or env.series_path,
-        "animes_path": db_settings.get("animes_path") or env.animes_path,
+        "movies_path": get_config("movies_path", db, required=True),
+        "series_path": get_config("series_path", db, required=True),
+        "animes_path": get_config("animes_path", db, required=True),
     }

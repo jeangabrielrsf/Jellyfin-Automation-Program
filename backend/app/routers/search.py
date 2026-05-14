@@ -1,28 +1,31 @@
 """Search router."""
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Optional
+from sqlalchemy.orm import Session
+from app.database import get_db
 from app.services.tmdb_service import TMDBService
 from app.scrapers.jackett_scraper import JackettScraper
 from app.models.tmdb import TMDBSearchResponse, TMDBDetail
 from app.models.torrent import TorrentResult
 from app.logging_config import get_logger
 from app.services.omdb_service import OMDbService
+from app.services.config_service import get_config
 
 router = APIRouter(prefix="/api/search", tags=["search"])
+logger = get_logger(__name__)
 
-async def _enrich_with_rt_data(detail: TMDBDetail, media_type: str) -> TMDBDetail:
+async def _enrich_with_rt_data(detail: TMDBDetail, media_type: str, db: Session | None = None) -> TMDBDetail:
     """Enrich a TMDBDetail with Rotten Tomatoes rating and URL from OMDB."""
     external_ids = getattr(detail, "external_ids", None) or {}
     imdb_id = external_ids.get("imdb_id")
     if not imdb_id:
         return detail
 
-    from app.config import get_settings
-    settings = get_settings()
-    if not settings.omdb_api_key:
+    omdb_api_key = get_config("omdb_api_key", db, required=False)
+    if not omdb_api_key:
         return detail
 
-    omdb = OMDbService(api_key=settings.omdb_api_key)
+    omdb = OMDbService(api_key=omdb_api_key)
     try:
         omdb_data = await omdb.get_by_imdb_id(imdb_id)
         if omdb_data:
@@ -40,10 +43,11 @@ async def _enrich_with_rt_data(detail: TMDBDetail, media_type: str) -> TMDBDetai
 @router.get("/", response_model=TMDBSearchResponse)
 async def search_media(
     q: str = Query(..., description="Search query"),
-    page: int = Query(1, ge=1)
+    page: int = Query(1, ge=1),
+    db: Session = Depends(get_db),
 ):
     """Search for movies and TV shows on TMDB."""
-    service = TMDBService()
+    service = TMDBService(db=db)
     try:
         results = await service.search(q, page)
         return results
@@ -53,14 +57,17 @@ async def search_media(
         await service.close()
 
 @router.get("/movie/{movie_id}", response_model=TMDBDetail)
-async def get_movie_detail(movie_id: int):
+async def get_movie_detail(
+    movie_id: int,
+    db: Session = Depends(get_db),
+):
     """Get movie details by TMDB ID."""
-    service = TMDBService()
+    service = TMDBService(db=db)
     try:
         result = await service.get_movie_detail(movie_id)
         if not result:
             raise HTTPException(status_code=404, detail="Movie not found")
-        result = await _enrich_with_rt_data(result, "movie")
+        result = await _enrich_with_rt_data(result, "movie", db=db)
         return result
     except HTTPException:
         raise
@@ -70,14 +77,17 @@ async def get_movie_detail(movie_id: int):
         await service.close()
 
 @router.get("/tv/{tv_id}", response_model=TMDBDetail)
-async def get_tv_detail(tv_id: int):
+async def get_tv_detail(
+    tv_id: int,
+    db: Session = Depends(get_db),
+):
     """Get TV show details by TMDB ID."""
-    service = TMDBService()
+    service = TMDBService(db=db)
     try:
         result = await service.get_tv_detail(tv_id)
         if not result:
             raise HTTPException(status_code=404, detail="TV show not found")
-        result = await _enrich_with_rt_data(result, "tv")
+        result = await _enrich_with_rt_data(result, "tv", db=db)
         return result
     except HTTPException:
         raise
@@ -87,9 +97,12 @@ async def get_tv_detail(tv_id: int):
         await service.close()
 
 @router.get("/tv/{tv_id}/seasons")
-async def get_tv_seasons(tv_id: int):
+async def get_tv_seasons(
+    tv_id: int,
+    db: Session = Depends(get_db),
+):
     """Get season list with episode counts for a TV show."""
-    service = TMDBService()
+    service = TMDBService(db=db)
     try:
         result = await service.get_tv_detail(tv_id)
         if not result:
@@ -109,9 +122,13 @@ async def get_tv_seasons(tv_id: int):
         await service.close()
 
 @router.get("/tv/{tv_id}/season/{season_number}")
-async def get_tv_season_detail(tv_id: int, season_number: int):
+async def get_tv_season_detail(
+    tv_id: int,
+    season_number: int,
+    db: Session = Depends(get_db),
+):
     """Get season detail with episodes for a TV show."""
-    service = TMDBService()
+    service = TMDBService(db=db)
     try:
         result = await service.get_tv_season_detail(tv_id, season_number)
         return result
@@ -130,11 +147,12 @@ async def search_torrents(
     episode: Optional[int] = Query(None, ge=1),
     quality: Optional[str] = Query("1080p"),
     language: Optional[str] = Query("legendado"),
-    query: Optional[str] = Query(None, description="Custom search query override")
+    query: Optional[str] = Query(None, description="Custom search query override"),
+    db: Session = Depends(get_db),
 ):
     """Search for torrents for a specific media using TMDB titles or a custom query."""
-    service = TMDBService()
-    scraper = JackettScraper()
+    service = TMDBService(db=db)
+    scraper = JackettScraper(db=db)
     try:
         if query and query.strip():
             # Custom query provided — use it directly (season/episode suffix still applies)
@@ -197,7 +215,6 @@ async def search_torrents(
     except HTTPException:
         raise
     except Exception as e:
-        logger = get_logger(__name__)
         logger.exception("Torrent search failed unexpectedly")
         raise HTTPException(status_code=500, detail=f"Torrent search failed: {str(e)}")
     finally:

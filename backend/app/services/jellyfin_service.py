@@ -2,8 +2,9 @@
 from typing import Any, Dict, List, Optional
 
 import httpx
+from sqlalchemy.orm import Session
 
-from app.config import get_settings
+from app.services.config_service import get_config
 from app.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -11,8 +12,10 @@ logger = get_logger(__name__)
 class JellyfinService:
     """Service to interact with Jellyfin API."""
     
-    def __init__(self) -> None:
-        self.settings = get_settings()
+    def __init__(self, db: Session | None = None) -> None:
+        self.db = db
+        self.url = get_config("jellyfin_url", db, required=True)
+        self.api_key = get_config("jellyfin_api_key", db, required=True)
         self.client = httpx.AsyncClient(timeout=30.0)
     
     async def scan_library(self, library_name: Optional[str] = None) -> bool:
@@ -26,7 +29,7 @@ class JellyfinService:
         """
         try:
             headers = {
-                "X-Emby-Token": self.settings.jellyfin_api_key,
+                "X-Emby-Token": self.api_key,
                 "Content-Type": "application/json"
             }
             
@@ -36,7 +39,7 @@ class JellyfinService:
                     if lib.get("Name") == library_name:
                         library_id = lib.get("Id")
                         response = await self.client.post(
-                            f"{self.settings.jellyfin_url}/Items/{library_id}/Refresh",
+                            f"{self.url}/Items/{library_id}/Refresh",
                             headers=headers,
                             params={
                                 "Recursive": "true",
@@ -52,7 +55,7 @@ class JellyfinService:
                 return False
             else:
                 response = await self.client.post(
-                    f"{self.settings.jellyfin_url}/Library/Refresh",
+                    f"{self.url}/Library/Refresh",
                     headers=headers
                 )
                 response.raise_for_status()
@@ -71,11 +74,11 @@ class JellyfinService:
         """
         try:
             headers = {
-                "X-Emby-Token": self.settings.jellyfin_api_key
+                "X-Emby-Token": self.api_key
             }
 
             response = await self.client.get(
-                f"{self.settings.jellyfin_url}/Library/VirtualFolders",
+                f"{self.url}/Library/VirtualFolders",
                 headers=headers
             )
             response.raise_for_status()

@@ -2,7 +2,8 @@
 import time
 import httpx
 from typing import Optional, List, Dict, Tuple
-from app.config import get_settings
+from sqlalchemy.orm import Session
+from app.services.config_service import get_config
 from app.models.discover import (
     DiscoverParams,
     SectionInfo,
@@ -58,9 +59,9 @@ class DiscoverService:
     SECTION_TTL = 300   # 5 minutes
     GENRE_TTL = 3600    # 1 hour
 
-    def __init__(self):
-        self.settings = get_settings()
-        self.api_key = self.settings.tmdb_api_key
+    def __init__(self, db: Session | None = None):
+        self.db = db
+        self.api_key = get_config("tmdb_api_key", db, required=True)
         self.client = httpx.AsyncClient(timeout=10.0)
         self._section_cache: Dict[str, Tuple[float, DiscoverSection]] = {}
         self._genre_cache: Optional[Tuple[float, List[Genre]]] = None

@@ -1,6 +1,7 @@
 """Background worker to monitor qBittorrent downloads and update database."""
 import asyncio
 from typing import Optional, Callable, Awaitable
+from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models.download import Download, DownloadStatus
 from app.services.qbittorrent_service import QBittorrentService
@@ -63,7 +64,7 @@ class DownloadWorker:
             if not downloads:
                 return
 
-            service = QBittorrentService()
+            service = QBittorrentService(db=db)
             try:
                 # Get all torrents from qBittorrent
                 torrents = await service.get_torrents()
@@ -124,9 +125,9 @@ class DownloadWorker:
         finally:
             db.close()
     
-    async def _organize_completed_download(self, download: Download, db: object):
+    async def _organize_completed_download(self, download: Download, db: Session):
         """Organize files when a download completes."""
-        service = QBittorrentService()
+        service = QBittorrentService(db=db)
         torrent_hash = download.torrent_hash
         was_paused = False
 

@@ -5,9 +5,29 @@ from unittest.mock import patch
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
+from app.database import get_db
+from app.models.settings import Setting
 from app.models.discover import SectionCatalog, DiscoverSection, SectionInfo, Genre, DiscoverParams
 
 SKIP_INTEGRATION = not os.environ.get("TMDB_API_KEY")
+
+
+@pytest.fixture
+def discover_client(db_session):
+    """Set up DB override and populate TMDB_API_KEY for discover tests."""
+    db_session.add(Setting(key="tmdb_api_key", value="test-key"))
+    db_session.commit()
+
+    def override_get_db():
+        try:
+            yield db_session
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
+    with patch('app.main.init_db'):
+        yield
+    app.dependency_overrides.clear()
 
 
 class _MockResponse:
@@ -53,7 +73,7 @@ def mock_discover_http():
 
 
 @pytest.mark.anyio
-async def test_get_sections_catalog_no_filters():
+async def test_get_sections_catalog_no_filters(discover_client):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/api/discover/sections/")
@@ -69,7 +89,7 @@ async def test_get_sections_catalog_no_filters():
 
 
 @pytest.mark.anyio
-async def test_get_sections_catalog_filtered_omits_trending():
+async def test_get_sections_catalog_filtered_omits_trending(discover_client):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/api/discover/sections/", params={"genre_id": 28})
@@ -91,7 +111,7 @@ async def test_get_sections_catalog_invalid_media_type():
 
 
 @pytest.mark.anyio
-async def test_get_genres(mock_discover_http):
+async def test_get_genres(mock_discover_http, discover_client):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/api/discover/genres/")
@@ -103,7 +123,7 @@ async def test_get_genres(mock_discover_http):
 
 
 @pytest.mark.anyio
-async def test_get_section_not_found():
+async def test_get_section_not_found(discover_client):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/api/discover/sections/nonexistent-section/")
@@ -113,7 +133,7 @@ async def test_get_section_not_found():
 
 @pytest.mark.anyio
 @pytest.mark.skipif(SKIP_INTEGRATION, reason="TMDB_API_KEY not set")
-async def test_get_popular_movies_section():
+async def test_get_popular_movies_section(discover_client):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/api/discover/sections/popular-movies/")
@@ -127,7 +147,7 @@ async def test_get_popular_movies_section():
 
 
 @pytest.mark.anyio
-async def test_sections_media_type_validation(mock_discover_http):
+async def test_sections_media_type_validation(mock_discover_http, discover_client):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/api/discover/sections/popular-movies/", params={"media_type": "movie"})
@@ -138,7 +158,7 @@ async def test_sections_media_type_validation(mock_discover_http):
 
 
 @pytest.mark.anyio
-async def test_genres_consistent_across_requests(mock_discover_http):
+async def test_genres_consistent_across_requests(mock_discover_http, discover_client):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response1 = await client.get("/api/discover/genres/")
@@ -153,7 +173,7 @@ async def test_genres_consistent_across_requests(mock_discover_http):
 
 @pytest.mark.anyio
 @pytest.mark.skipif(SKIP_INTEGRATION, reason="TMDB_API_KEY not set")
-async def test_anime_section_has_results():
+async def test_anime_section_has_results(discover_client):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/api/discover/sections/popular-animes/")
@@ -200,7 +220,7 @@ class TestGenre:
 
 
 @pytest.mark.anyio
-async def test_trending_with_filters_returns_empty():
+async def test_trending_with_filters_returns_empty(discover_client):
     """Trending section + filters should return empty results, not 404."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -214,7 +234,7 @@ async def test_trending_with_filters_returns_empty():
 
 @pytest.mark.anyio
 @pytest.mark.skipif(SKIP_INTEGRATION, reason="TMDB_API_KEY not set")
-async def test_genre_section_returns_data():
+async def test_genre_section_returns_data(discover_client):
     """Integration test: verify genre-action section works."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -247,7 +267,7 @@ async def test_get_providers():
 
 
 @pytest.mark.anyio
-async def test_get_sections_catalog_with_streaming_omits_incompatible():
+async def test_get_sections_catalog_with_streaming_omits_incompatible(discover_client):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/api/discover/sections/", params={"watch_provider_id": 8})
@@ -264,7 +284,7 @@ async def test_get_sections_catalog_with_streaming_omits_incompatible():
 
 
 @pytest.mark.anyio
-async def test_section_with_watch_provider_uses_discover(mock_discover_http):
+async def test_section_with_watch_provider_uses_discover(mock_discover_http, discover_client):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get(
