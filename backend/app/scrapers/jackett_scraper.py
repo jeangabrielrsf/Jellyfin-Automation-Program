@@ -7,7 +7,8 @@ from typing import List
 import httpx
 from app.scrapers.base import BaseScraper
 from app.models.torrent import TorrentResult
-from app.config import get_settings
+from sqlalchemy.orm import Session
+from app.services.config_service import get_config
 from app.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -18,23 +19,27 @@ class JackettScraper(BaseScraper):
     name = "jackett"
     priority = 10
     
-    def __init__(self):
-        self.settings = get_settings()
+    def __init__(self, db: Session | None = None):
+        self.db = db
+        self.url = get_config("jackett_url", db, required=True)
+        self.api_key = get_config("jackett_api_key", db, required=True)
+        timeout_val = get_config("jackett_timeout", db, required=False) or "120"
+        self.timeout = timeout_val
         self.client = httpx.AsyncClient(
-            timeout=httpx.Timeout(10.0, read=float(self.settings.jackett_timeout))
+            timeout=httpx.Timeout(10.0, read=float(timeout_val))
         )
     
     async def search(self, query: str, media_type: str, quality: str = "1080p", language: str = "legendado") -> List[TorrentResult]:
         """Search for torrents via Jackett."""
         logger.info("Searching Jackett", query=query, media_type=media_type, quality=quality)
         
-        if not self.settings.jackett_api_key:
+        if not self.api_key:
             logger.warning("Jackett API key not configured")
             return []
         
-        url = f"{self.settings.jackett_url}/api/v2.0/indexers/all/results"
+        url = f"{self.url}/api/v2.0/indexers/all/results"
         params = {
-            "apikey": self.settings.jackett_api_key,
+            "apikey": self.api_key,
             "Query": query,
             "Category": self._get_category(media_type)
         }
@@ -76,22 +81,22 @@ class JackettScraper(BaseScraper):
         except httpx.ConnectError as e:
             logger.error(
                 "Jackett connection error — check if Jackett is running and accessible from the container",
-                url=self.settings.jackett_url,
+                url=self.url,
                 error=str(e)
             )
             return []
         except httpx.TimeoutException as e:
             logger.error(
                 "Jackett request timed out — the service may be overloaded or unreachable",
-                url=self.settings.jackett_url,
-                timeout=self.settings.jackett_timeout,
+                url=self.url,
+                timeout=self.timeout,
                 error=str(e)
             )
             return []
         except httpx.HTTPStatusError as e:
             logger.error(
                 "Jackett returned an HTTP error",
-                url=self.settings.jackett_url,
+                url=self.url,
                 status_code=e.response.status_code,
                 response_body=e.response.text[:200],
                 error=str(e)
@@ -100,14 +105,14 @@ class JackettScraper(BaseScraper):
         except json.JSONDecodeError as e:
             logger.error(
                 "Failed to decode Jackett response as JSON",
-                url=self.settings.jackett_url,
+                url=self.url,
                 error=str(e)
             )
             return []
         except Exception as e:
             logger.error(
                 "Jackett search failed with unexpected error",
-                url=self.settings.jackett_url,
+                url=self.url,
                 error_type=type(e).__name__,
                 error=str(e)
             )
