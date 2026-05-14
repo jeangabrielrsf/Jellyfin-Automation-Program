@@ -8,11 +8,11 @@ Aplicação full-stack para automação de downloads de filmes, séries e animes
 - [Arquitetura](#arquitetura)
 - [Tecnologias](#tecnologias)
 - [Pré-requisitos](#pré-requisitos)
-- [Instalação](#instalação)
-- [Configuração](#configuração)
+- [Instalação via Docker (Recomendado)](#instalação-via-docker-recomendado)
+- [Configuração Pós-Instalação](#configuração-pós-instalação)
+- [Instalação Manual (Desenvolvimento)](#instalação-manual-desenvolvimento)
 - [Uso](#uso)
 - [Testes](#testes)
-- [Deploy](#deploy)
 - [API](#api)
 - [WebSocket](#websocket)
 - [Contribuição](#contribuição)
@@ -38,7 +38,7 @@ O **Jellyfin Automation** permite:
 ┌─────────────────────────────────────────────────────────────┐
 │                        Frontend                              │
 │              (React + Vite + TailwindCSS)                   │
-│                     Porta: 3000                              │
+│                     Porta: 3001                              │
 └──────────────────────┬──────────────────────────────────────┘
                        │ HTTP / WebSocket
                        ▼
@@ -46,20 +46,23 @@ O **Jellyfin Automation** permite:
 │                        Backend                               │
 │            (FastAPI + SQLAlchemy + Uvicorn)                 │
 │                     Porta: 8000                              │
-└──┬───────────────────┬───────────────────┬──────────────────┘
-   │                   │                   │
-   ▼                   ▼                   ▼
-┌────────┐     ┌────────────┐     ┌─────────────────┐
-│PostgreSQL│     │  qBittorrent │     │    Jellyfin     │
-│ 5432   │     │    8080      │     │     8096        │
-└────────┘     └────────────┘     └─────────────────┘
-   │
-   ▼
-┌────────────┐
-│   Jackett   │
-│   9117      │
-└────────────┘
+└──┬──────────────┬──────────────────┬──────────────────┬──────┘
+   │              │                  │                  │
+   ▼              ▼                  ▼                  ▼
+┌────────┐  ┌──────────┐    ┌────────────┐    ┌──────────────┐
+│Postgres│  │qBittorrent│    │  Jackett   │    │ FlareSolverr │
+│  5432  │  │   8082    │    │   9117     │    │    8191      │
+└────────┘  └──────────┘    └────────────┘    └──────────────┘
+                                                          │
+                                                          ▼
+                                                  ┌──────────────┐
+                                                  │   Jellyfin   │
+                                                  │  (Windows)   │
+                                                  │    8096      │
+                                                  └──────────────┘
 ```
+
+**Nota:** qBittorrent, Jackett e FlareSolverr rodam como containers Docker. O Jellyfin permanece no Windows (serviço externo).
 
 ---
 
@@ -87,17 +90,18 @@ O **Jellyfin Automation** permite:
 
 ## Pré-requisitos
 
+- Docker e Docker Compose
+- Jellyfin Server (no Windows ou outro host)
+- TMDB API Key (gratuito em https://www.themoviedb.org/settings/api)
+
+**Para desenvolvimento local (sem Docker):**
 - Python 3.12+
 - Node.js 20+
 - PostgreSQL 15+
-- qBittorrent com Web UI habilitado
-- Jackett configurado com indexadores
-- Jellyfin Server
-- TMDB API Key (gratuito em https://www.themoviedb.org/settings/api)
 
 ---
 
-## Instalação
+## Instalação via Docker (Recomendado)
 
 ### 1. Clone o repositório
 
@@ -110,10 +114,90 @@ cd jellyfin_automation
 
 ```bash
 cp .env.example .env
-# Edite .env com suas configurações
+# Edite .env com suas configurações (API keys, caminhos de mídia, etc.)
 ```
 
-### 3. Backend
+### 3. Inicie os serviços
+
+```bash
+docker-compose up --build -d
+```
+
+Serviços expostos:
+
+| Serviço | URL | Descrição |
+|---------|-----|-----------|
+| Frontend | `http://localhost:3001` | Interface web |
+| Backend API | `http://localhost:8000` | API REST + Swagger |
+| qBittorrent | `http://localhost:8082` | Gerenciador de torrents |
+| Jackett | `http://localhost:9117` | Indexador de torrents |
+| FlareSolverr | `http://localhost:8191` | Bypass Cloudflare |
+| PostgreSQL | `localhost:5432` | Banco de dados |
+
+---
+
+## Configuração Pós-Instalação
+
+Após iniciar os containers, é necessário configurar os serviços. As configurações são salvas no banco de dados e podem ser gerenciadas pela interface web.
+
+### 1. Configurar API Keys (pela UI)
+
+Acesse `http://localhost:3001/settings` e preencha:
+
+| Campo | Descrição |
+|-------|-----------|
+| TMDB API Key | Chave da API do TMDB |
+| OMDB API Key | Chave da API do OMDB (opcional, para Rotten Tomatoes) |
+| Jackett URL | `http://jackett:9117` (Docker) ou `http://localhost:9117` (local) |
+| Jackett API Key | Copiada da UI do Jackett |
+| qBittorrent Host | `http://qbittorrent:8080` (Docker) ou `http://localhost:8082` (local) |
+| qBittorrent Username | Usuário do qBittorrent |
+| qBittorrent Password | Senha do qBittorrent |
+| Jellyfin URL | `http://host.docker.internal:8096` (Docker) ou `http://localhost:8096` (local) |
+| Jellyfin API Key | Criada no Dashboard do Jellyfin |
+
+### 2. Configurar Jackett
+
+1. Acesse `http://localhost:9117`
+2. **Adicione indexadores** de torrent (ex: 1337x, ThePirateBay, etc.)
+3. **Configure o FlareSolverr:**
+   - Clique em **Config** (ícone de engrenagem)
+   - No campo **FlareSolverr API URL**, coloque: `http://flaresolverr:8191`
+   - Clique em **Save**
+4. **Copie a API Key** (canto superior direito)
+5. Cole a API Key na página de Configurações do app
+
+### 3. Configurar qBittorrent
+
+Na primeira execução, o qBittorrent gera uma **senha temporária**. Para definir uma senha permanente:
+
+1. Acesse `http://localhost:8082`
+2. Faça login com `admin` e a senha temporária (veja nos logs: `docker compose logs qbittorrent | grep "temporary password"`)
+3. Vá em **Settings → Web UI → Authentication**
+4. Defina uma senha fixa
+5. Atualize a senha na página de Configurações do app
+
+### 4. Configurar Jellyfin
+
+1. Acesse o Jellyfin em `http://localhost:8096`
+2. Crie uma **API Key** em Dashboard → Advanced → API Keys
+3. Configure as pastas de biblioteca para apontar para os mesmos caminhos definidos em `MOVIES_PATH`, `SERIES_PATH`, `ANIMES_PATH`
+
+### 5. Configurar Caminhos de Mídia
+
+Na página de Configurações do app, defina os caminhos absolutos onde os arquivos serão organizados:
+
+| Campo | Exemplo |
+|-------|---------|
+| Pasta de Filmes | `/mnt/d/Filmes` |
+| Pasta de Séries | `/mnt/d/Séries` |
+| Pasta de Animes | `/mnt/d/Animes` |
+
+---
+
+## Instalação Manual (Desenvolvimento)
+
+### 1. Backend
 
 ```bash
 cd backend
@@ -128,55 +212,18 @@ alembic upgrade head
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 4. Frontend
+### 2. Frontend
 
 ```bash
 cd frontend
 npm install
-npm run dev        # Modo desenvolvimento
+npm run dev        # Modo desenvolvimento (porta 3001)
 npm run build      # Build de produção
 ```
 
----
+### 3. Serviços externos
 
-## Configuração
-
-### Variáveis de Ambiente
-
-| Variável | Descrição | Exemplo |
-|----------|-----------|---------|
-| `DATABASE_URL` | URL do PostgreSQL | `postgresql://user:pass@localhost/db` |
-| `TMDB_API_KEY` | Chave API do TMDB | `abc123...` |
-| `QBITTORRENT_HOST` | URL do qBittorrent Web UI | `http://localhost:8080` |
-| `QBITTORRENT_USERNAME` | Usuário do qBittorrent | `admin` |
-| `QBITTORRENT_PASSWORD` | Senha do qBittorrent | `adminadmin` |
-| `JACKETT_URL` | URL do Jackett | `http://localhost:9117` |
-| `JACKETT_API_KEY` | Chave API do Jackett | `xyz789...` |
-| `JELLYFIN_URL` | URL do Jellyfin | `http://localhost:8096` |
-| `JELLYFIN_API_KEY` | Chave API do Jellyfin | `def456...` |
-| `MOVIES_PATH` | Pasta de filmes | `/media/movies` |
-| `SERIES_PATH` | Pasta de séries | `/media/series` |
-| `ANIMES_PATH` | Pasta de animes | `/media/animes` |
-| `LOG_LEVEL` | Nível de log | `INFO` |
-| `SECRET_KEY` | Chave secreta para JWT | `change-me-in-production` |
-
-### Configuração dos Serviços Externos
-
-#### qBittorrent
-1. Abra **Ferramentas → Opções → Web UI**
-2. Habilitar "Web User Interface"
-3. Definir usuário/senha
-4. Permitir acesso sem senha da máquina local (opcional)
-
-#### Jackett
-1. Acesse `http://localhost:9117`
-2. Adicione indexadores de torrent
-3. Copie a **API Key** das configurações
-
-#### Jellyfin
-1. Acesse `http://localhost:8096`
-2. Crie uma **API Key** em Dashboard → Advanced → API Keys
-3. Configure as pastas de biblioteca para apontar para os mesmos caminhos definidos em `MOVIES_PATH`, `SERIES_PATH`, `ANIMES_PATH`
+Quando rodando fora do Docker, você precisa ter qBittorrent, Jackett e FlareSolverr instalados e configurados separadamente. Atualize as URLs no `.env` ou na página de Configurações para apontar para `localhost`.
 
 ---
 
@@ -184,7 +231,7 @@ npm run build      # Build de produção
 
 ### Interface Web
 
-Acesse `http://localhost:3000` para a interface web.
+Acesse `http://localhost:3001` para a interface web.
 
 #### Buscar Conteúdo
 1. Digite o nome do filme/série/anime na barra de busca
@@ -197,7 +244,7 @@ Acesse `http://localhost:3000` para a interface web.
 - Use **Pausar**, **Continuar** ou **Cancelar** para gerenciar
 
 #### Configurações
-- Acesse **Configurações** para ajustar qualidade padrão, idioma e paths
+- Acesse **Configurações** para ajustar caminhos de mídia, preferências de download e chaves de API
 
 ### API REST
 
@@ -207,7 +254,7 @@ A documentação interativa da API está disponível em:
 
 ### WebSocket
 
-Conecte-se ao WebSocket em `ws://localhost:8000/api/ws` para receber atualizações em tempo real sobre downloads.
+Conecte-se ao WebSocket em `ws://localhost:8000/ws` para receber atualizações em tempo real sobre downloads.
 
 ---
 
@@ -221,8 +268,6 @@ source venv/bin/activate
 pytest tests/ -v
 ```
 
-Cobertura atual: **45 testes** cobrindo configurações, logging, serviços (TMDB, qBittorrent, organizador, Jellyfin), scrapers, e routers.
-
 ### Frontend
 
 ```bash
@@ -234,39 +279,6 @@ O build deve completar sem erros de TypeScript.
 
 ---
 
-## Deploy
-
-### Docker Compose (Recomendado)
-
-```bash
-# Configure as variáveis no .env
-cp .env.example .env
-nano .env
-
-# Inicie todos os serviços
-docker-compose up --build -d
-```
-
-Serviços expostos:
-- Frontend: `http://localhost:3000`
-- Backend API: `http://localhost:8000`
-- PostgreSQL: `localhost:5432`
-
-### Estrutura de Pastas para Docker
-
-As pastas de mídia são montadas como volumes:
-
-```yaml
-volumes:
-  - ${MOVIES_PATH:-./media/movies}:/movies
-  - ${SERIES_PATH:-./media/series}:/series
-  - ${ANIMES_PATH:-./media/animes}:/animes
-```
-
-Certifique-se de que o usuário do container tem permissão de escrita nessas pastas.
-
----
-
 ## API
 
 ### Endpoints Principais
@@ -275,21 +287,21 @@ Certifique-se de que o usuário do container tem permissão de escrita nessas pa
 |--------|----------|-----------|
 | GET | `/api/search/?q={query}` | Buscar no TMDB |
 | GET | `/api/search/torrents` | Buscar torrents via Jackett |
-| GET | `/api/downloads` | Listar downloads |
-| POST | `/api/downloads` | Criar novo download |
+| GET | `/api/downloads/` | Listar downloads |
+| POST | `/api/downloads/` | Criar novo download |
 | DELETE | `/api/downloads/{id}` | Cancelar download |
 | POST | `/api/downloads/{id}/pause` | Pausar no qBittorrent |
 | POST | `/api/downloads/{id}/resume` | Continuar no qBittorrent |
-| GET | `/api/settings` | Obter configurações |
+| GET | `/api/settings/` | Obter configurações |
 | PUT | `/api/settings/{key}` | Atualizar configuração |
-| GET | `/api/logs` | Obter logs estruturados |
-| WS | `/api/ws` | WebSocket para updates em tempo real |
+| GET | `/api/logs/` | Obter logs estruturados |
+| WS | `/ws` | WebSocket para updates em tempo real |
 
 ---
 
 ## WebSocket
 
-O backend expõe um endpoint WebSocket em `/api/ws` que envia atualizações JSON sobre o estado dos downloads:
+O backend expõe um endpoint WebSocket em `/ws` que envia atualizações JSON sobre o estado dos downloads:
 
 ```json
 {

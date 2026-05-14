@@ -29,7 +29,7 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 **Docker**
 
 - `docker-compose up --build -d` — full stack
-- Frontend container exposes **3001**, backend 8000, Postgres 5432
+- Frontend container exposes **3001**, backend 8000, Postgres 5432, qBittorrent 8082, Jackett 9117, FlareSolverr 8191
 
 ## Backend architecture
 
@@ -41,6 +41,13 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 - **WebSocket:** `/ws` endpoint in `app/main.py` broadcasts download updates.
 - **Static files:** `main.py` mounts `../frontend/dist` at `/` for production serving; if missing, app starts without it.
 - **Background worker:** `DownloadWorker` is started in the FastAPI lifespan and syncs qBittorrent state every 10 seconds.
+
+## Configuration system
+
+- **Priority chain:** DB → `.env` → error. All API keys and service URLs are stored in the `settings` table and read via `get_config(key, db, required=True)` from `app/services/config_service.py`.
+- **Seed on startup:** On first boot, `_seed_config_from_env()` in `main.py` populates the DB with values from `.env` for any missing keys.
+- **Runtime updates:** Settings can be changed via the Settings UI (`PUT /api/settings/{key}`). Services pick up new values on their next instantiation (most services are created per-request; DownloadWorker creates fresh instances every 10s).
+- **`@lru_cache()` on `get_settings()`:** The `.env` settings object is cached for the process lifetime. DB values override cached `.env` values via `get_config()`.
 
 ## Frontend architecture
 
@@ -70,19 +77,41 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
     - Updates `progress`, `speed`, `eta`, and `status` in the database
     - When a download reaches `COMPLETED`, triggers `OrganizerService` to move files to the appropriate library folder (`movies_path`, `series_path`, or `animes_path`)
 
+## Docker services
+
+| Service | Image | Ports | Notes |
+|---------|-------|-------|-------|
+| db | `postgres:15-alpine` | 5432 | PostgreSQL database |
+| backend | Custom build | 8000 | FastAPI app |
+| frontend | Custom build | 3001 | React + nginx |
+| qbittorrent | `lscr.io/linuxserver/qbittorrent` | 8082, 6881 | Torrent client (host port 8082) |
+| jackett | `lscr.io/linuxserver/jackett` | 9117 | Torrent indexer gateway |
+| flaresolverr | `ghcr.io/flaresolverr/flaresolverr` | 8191 | Cloudflare bypass for Jackett |
+
+**qBittorrent notes:**
+- Generates a temporary password on first run. Set a permanent password via Web UI → Settings → Web UI → Authentication.
+- CSRF protection and host header validation are disabled to allow localhost access.
+- Backend connects via Docker network (`http://qbittorrent:8080`), not the host port.
+- qBittorrent v5 returns HTTP 204 (empty body) on successful login, not HTTP 200 with "Ok." — `QBittorrentService._authenticate()` handles both.
+
+**Jackett notes:**
+- Comes with no indexers configured. User must add indexers via Web UI at `http://localhost:9117`.
+- FlareSolverr must be configured in Jackett settings: URL = `http://flaresolverr:8191`.
+- API key is generated on first run and displayed in the Web UI header.
+
 ## Environment / gotchas
 
 - `.env` must be at repo root; `backend/alembic.ini` hardcodes a fallback DB URL but the app uses `DATABASE_URL` from `.env`.
 - Media paths (`MOVIES_PATH`, `SERIES_PATH`, `ANIMES_PATH`) must be absolute and writable.
-- External services required for full functionality: qBittorrent (Web UI), Jackett, Jellyfin Server, TMDB API key.
-- When running backend outside Docker but services on host, use `host.docker.internal` (Docker) or host IP (WSL2 native) for external service URLs.
+- Jellyfin runs externally (typically on Windows host). Use `http://host.docker.internal:8096` from Docker containers.
 - `dist/` is in `.gitignore`; frontend must be built before backend can serve static files.
-- No pre-commit hooks, CI workflows, or formatting automation are configured yet.
+- `jackett/config/` and `qbittorrent/config/` are in `.gitignore` — they contain runtime state and credentials.
 - **Trailing slashes matter:** FastAPI routes are defined with trailing slashes (e.g., `/api/downloads/`). Frontend must use trailing slashes to avoid 307 redirects.
 - **Jackett links expire:** `download_url` from Jackett search results may expire after a few minutes. The backend implements fallback logic to refresh expired links.
 - **DownloadWorker runs on startup:** The background worker starts automatically with the FastAPI app and cannot be disabled without code changes.
 - **OrganizerService moves files on completion:** Completed downloads are automatically organized into `MOVIES_PATH`, `SERIES_PATH`, or `ANIMES_PATH` based on media type. Ensure these paths are writable.
-- Jackett, QBittorrent e Jellyfin are installed on Windows (host).
+- **ConfigError on missing settings:** If a required config key is missing from both DB and `.env`, the API returns HTTP 500 with `{"error": "configuration_error", "key": "...", "message": "..."}`.
+- **nginx.conf uses Docker service names:** The frontend nginx proxies to `http://backend:8000`, not `backend-host`.
 - This project runs on WSL2.
 
 ## Running a single test
