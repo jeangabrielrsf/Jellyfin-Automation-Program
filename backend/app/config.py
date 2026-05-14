@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     jackett_api_key: str = Field(default="")
     jackett_timeout: int = Field(default=120)
     
+    # OMDB
+    omdb_api_key: str = Field(default="")
+    
     # Jellyfin
     jellyfin_url: str = Field(default="http://localhost:8096")
     jellyfin_api_key: str = Field(default="")
