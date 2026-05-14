@@ -107,7 +107,7 @@ class TestSearchRouter:
         )
         mock_torrents = [
             TorrentResult(
-                title="Test",
+                title="Test Movie 2023 1080p WEB-DL",
                 indexer="1337x",
                 size="1 GB",
                 seeds=100,
@@ -115,7 +115,17 @@ class TestSearchRouter:
                 download_url="http://example.com",
                 magnet_url="magnet:?xt=urn:btih:test",
                 score=100.0
-            )
+            ),
+            TorrentResult(
+                title="Some Unrelated Anime S01E01 1080p",
+                indexer="Nyaa",
+                size="500 MB",
+                seeds=10,
+                peers=5,
+                download_url="http://example.com/unrelated",
+                magnet_url="magnet:?xt=urn:btih:unrelated",
+                score=50.0
+            ),
         ]
 
         with patch('app.routers.search.TMDBService.get_movie_detail') as mock_detail_fn:
@@ -128,7 +138,7 @@ class TestSearchRouter:
                 assert response.status_code == 200
                 data = response.json()
                 assert len(data) == 1
-                assert data[0]["title"] == "Test"
+                assert data[0]["title"] == "Test Movie 2023 1080p WEB-DL"
 
     def test_get_tv_seasons(self, client, search_settings):
         """Test TV seasons endpoint."""

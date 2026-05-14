@@ -1,4 +1,5 @@
 """Search router."""
+import re
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -37,8 +38,16 @@ async def _enrich_with_rt_data(detail: TMDBDetail, media_type: str, db: Session 
         pass
     finally:
         await omdb.close()
-
     return detail
+
+
+def _title_matches(torrent_title: str, show_title: str) -> bool:
+    s = re.sub(r'[^a-z0-9]', '', show_title.lower())
+    if len(s) < 4:
+        return True
+    t = re.sub(r'[^a-z0-9]', '', torrent_title.lower())
+    return s in t
+
 
 @router.get("/", response_model=TMDBSearchResponse)
 async def search_media(
@@ -154,6 +163,9 @@ async def search_torrents(
     service = TMDBService(db=db)
     scraper = JackettScraper(db=db)
     try:
+        original_title = ""
+        localized_title = ""
+
         if query and query.strip():
             # Custom query provided — use it directly (season/episode suffix still applies)
             suffix = ""
@@ -196,8 +208,8 @@ async def search_torrents(
 
         # Run Jackett searches and merge results
         all_results = []
-        for query in queries:
-            results = await scraper.search(query, media_type, quality, language)
+        for q in queries:
+            results = await scraper.search(q, media_type, quality, language)
             all_results.extend(results)
 
         # Deduplicate by magnet URL (fallback to title match)
@@ -210,6 +222,22 @@ async def search_torrents(
                 deduped.append(torrent)
 
         deduped.sort(key=lambda x: x.score, reverse=True)
+
+        if not (query and query.strip()):
+            valid_titles = [t for t in [original_title, localized_title] if t]
+            if valid_titles:
+                deduped = [
+                    t for t in deduped
+                    if any(_title_matches(t.title, vt) for vt in valid_titles)
+                ]
+
+        if season is not None and episode is not None:
+            ep = f"s{season:02d}e{episode:02d}"
+            deduped = [
+                t for t in deduped
+                if ep in re.sub(r'[^a-z0-9]', '', t.title.lower())
+            ]
+
         return deduped
 
     except HTTPException:
