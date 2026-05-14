@@ -72,14 +72,28 @@ class TMDBService:
     async def get_tv_detail(self, tv_id: int) -> TMDBDetail:
         """Get TV show details by ID."""
         logger.info("Getting TV details", tv_id=tv_id)
-        
+
         url = f"{self.BASE_URL}/tv/{tv_id}"
         params = {
             "api_key": self.api_key,
             "language": "pt-BR",
             "append_to_response": "credits,external_ids"
         }
-        
+
         response = await self.client.get(url, params=params)
         response.raise_for_status()
         return TMDBDetail(**response.json())
+
+    async def get_tv_season_detail(self, tv_id: int, season_number: int) -> dict:
+        """Get season detail with episodes by TV ID and season number."""
+        logger.info("Getting TV season details", tv_id=tv_id, season_number=season_number)
+
+        url = f"{self.BASE_URL}/tv/{tv_id}/season/{season_number}"
+        params = {
+            "api_key": self.api_key,
+            "language": "pt-BR"
+        }
+
+        response = await self.client.get(url, params=params)
+        response.raise_for_status()
+        return response.json()

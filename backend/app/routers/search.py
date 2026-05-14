@@ -108,6 +108,20 @@ async def get_tv_seasons(tv_id: int):
     finally:
         await service.close()
 
+@router.get("/tv/{tv_id}/season/{season_number}")
+async def get_tv_season_detail(tv_id: int, season_number: int):
+    """Get season detail with episodes for a TV show."""
+    service = TMDBService()
+    try:
+        result = await service.get_tv_season_detail(tv_id, season_number)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get season details: {str(e)}")
+    finally:
+        await service.close()
+
 @router.get("/torrents")
 async def search_torrents(
     tmdb_id: int = Query(...),

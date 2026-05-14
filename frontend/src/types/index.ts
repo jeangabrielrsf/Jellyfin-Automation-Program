@@ -116,3 +116,21 @@ export interface StreamingProvider {
   name: string
   logo_path: string | null
 }
+
+export interface TVEpisode {
+  episode_number: number;
+  name: string;
+  overview: string;
+  still_path: string | null;
+  air_date: string | null;
+  vote_average: number;
+  runtime: number | null;
+}
+
+export interface TVSeasonDetail {
+  id: number;
+  name: string;
+  season_number: number;
+  overview: string;
+  episodes: TVEpisode[];
+}

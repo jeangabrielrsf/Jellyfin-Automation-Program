@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Download, Play, Info, Search, SearchCheck } from 'lucide-react';
+import { ArrowLeft, Download, Play, Info, Search, SearchCheck, Star, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { searchAPI, downloadAPI } from '../services/api';
-import { TorrentResult } from '../types';
+import { TorrentResult, TVEpisode } from '../types';
 
 const DetailPage: React.FC = () => {
   const { mediaType, id } = useParams<{ mediaType: string; id: string }>();
@@ -46,6 +46,12 @@ const DetailPage: React.FC = () => {
     queryKey: ['seasons', tmdbId],
     queryFn: () => searchAPI.getTVSeasons(tmdbId),
     enabled: isTV && !!tmdbId,
+  });
+
+  const { data: seasonDetailData, isLoading: seasonDetailLoading } = useQuery({
+    queryKey: ['season-detail', tmdbId, selectedSeason],
+    queryFn: () => searchAPI.getTVSeasonDetail(tmdbId, Number(selectedSeason)),
+    enabled: isTV && !!tmdbId && selectedSeason !== '',
   });
 
   const { data: torrentResults, isLoading: torrentsLoading, refetch: refetchTorrents } = useQuery({
@@ -128,12 +134,7 @@ const DetailPage: React.FC = () => {
     }
   }, [urlQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const episodeOptions = React.useMemo(() => {
-    if (!selectedSeason) return [];
-    const season = seasons.find((s: any) => s.season_number === Number(selectedSeason));
-    if (!season) return [];
-    return Array.from({ length: season.episode_count }, (_, i) => i + 1);
-  }, [selectedSeason, seasons]);
+  const episodes: TVEpisode[] = seasonDetailData?.data?.episodes || [];
 
   if (detailLoading) {
     return (
@@ -242,7 +243,7 @@ const DetailPage: React.FC = () => {
               <h3 className="font-display text-lg font-bold text-foreground">
                 Selecionar Temporada / Episódio
               </h3>
-              <div className="flex flex-wrap gap-4">
+              <div className="flex flex-wrap gap-4 items-end">
                 <div className="space-y-2">
                   <label className="text-sm text-muted-foreground">Temporada</label>
                   <select
@@ -262,21 +263,89 @@ const DetailPage: React.FC = () => {
                   </select>
                 </div>
                 {selectedSeason && (
-                  <div className="space-y-2">
-                    <label className="text-sm text-muted-foreground">Episódio</label>
-                    <select
-                      value={selectedEpisode}
-                      onChange={(e) => setSelectedEpisode(e.target.value === 'temporada-inteira' ? 'temporada-inteira' : Number(e.target.value))}
-                      className="px-4 py-2 rounded-xl glass bg-transparent border border-border/50 text-foreground"
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSelectedEpisode('temporada-inteira')}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                        selectedEpisode === 'temporada-inteira'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'glass border border-border/50 text-muted-foreground hover:text-foreground'
+                      }`}
                     >
-                      <option value="temporada-inteira">Temporada inteira</option>
-                      {episodeOptions.map((ep: number) => (
-                        <option key={ep} value={ep}>Episódio {ep}</option>
-                      ))}
-                    </select>
+                      Temporada inteira
+                    </button>
                   </div>
                 )}
               </div>
+
+              {selectedSeason && (
+                <div className="space-y-3">
+                  {seasonDetailLoading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="h-28 animate-shimmer rounded-xl bg-background/50" />
+                      ))}
+                    </div>
+                  ) : episodes.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {episodes.map((ep: TVEpisode) => {
+                        const isSelected = selectedEpisode === ep.episode_number;
+                        const voteColor = ep.vote_average >= 7 ? 'text-green-400' : ep.vote_average >= 5 ? 'text-yellow-400' : 'text-red-400';
+
+                        return (
+                          <button
+                            key={ep.episode_number}
+                            onClick={() => setSelectedEpisode(ep.episode_number)}
+                            className={`flex gap-3 p-3 rounded-xl border text-left transition-all ${
+                              isSelected
+                                ? 'border-primary bg-primary/10'
+                                : 'border-border/30 bg-background/50 hover:border-primary/30'
+                            }`}
+                          >
+                            {ep.still_path ? (
+                              <img
+                                src={`https://image.tmdb.org/t/p/w185${ep.still_path}`}
+                                alt=""
+                                className="w-28 h-16 object-cover rounded-lg shrink-0"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="w-28 h-16 rounded-lg bg-muted shrink-0 flex items-center justify-center">
+                                <Play className="w-6 h-6 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">E{String(ep.episode_number).padStart(2, '0')}</span>
+                                {ep.vote_average > 0 && (
+                                  <span className={`flex items-center gap-0.5 text-xs font-medium ${voteColor}`}>
+                                    <Star className="w-3 h-3 fill-current" />
+                                    {ep.vote_average.toFixed(1)}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm font-medium text-foreground truncate mt-0.5">
+                                {ep.name || `Episódio ${ep.episode_number}`}
+                              </p>
+                              {ep.air_date && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <Calendar className="w-3 h-3 text-muted-foreground" />
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(ep.air_date).toLocaleDateString('pt-BR')}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Nenhum episódio disponível para esta temporada.</p>
+                  )}
+                </div>
+              )}
+
               <button
                 onClick={handleSearchTorrents}
                 disabled={!selectedSeason}
