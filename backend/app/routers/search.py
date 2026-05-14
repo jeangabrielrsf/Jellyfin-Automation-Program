@@ -6,8 +6,36 @@ from app.scrapers.jackett_scraper import JackettScraper
 from app.models.tmdb import TMDBSearchResponse, TMDBDetail
 from app.models.torrent import TorrentResult
 from app.logging_config import get_logger
+from app.services.omdb_service import OMDbService
 
 router = APIRouter(prefix="/api/search", tags=["search"])
+
+async def _enrich_with_rt_data(detail: TMDBDetail, media_type: str) -> TMDBDetail:
+    """Enrich a TMDBDetail with Rotten Tomatoes rating and URL from OMDB."""
+    external_ids = getattr(detail, "external_ids", None) or {}
+    imdb_id = external_ids.get("imdb_id")
+    if not imdb_id:
+        return detail
+
+    from app.config import get_settings
+    settings = get_settings()
+    if not settings.omdb_api_key:
+        return detail
+
+    omdb = OMDbService(api_key=settings.omdb_api_key)
+    try:
+        omdb_data = await omdb.get_by_imdb_id(imdb_id)
+        if omdb_data:
+            detail.rt_rating = omdb_data.get("rt_rating")
+
+        display_title = detail.title or detail.name or ""
+        detail.rt_url = await omdb.build_rt_url(display_title, media_type)
+    except Exception:
+        pass
+    finally:
+        await omdb.close()
+
+    return detail
 
 @router.get("/", response_model=TMDBSearchResponse)
 async def search_media(
@@ -32,6 +60,7 @@ async def get_movie_detail(movie_id: int):
         result = await service.get_movie_detail(movie_id)
         if not result:
             raise HTTPException(status_code=404, detail="Movie not found")
+        result = await _enrich_with_rt_data(result, "movie")
         return result
     except HTTPException:
         raise
@@ -48,6 +77,7 @@ async def get_tv_detail(tv_id: int):
         result = await service.get_tv_detail(tv_id)
         if not result:
             raise HTTPException(status_code=404, detail="TV show not found")
+        result = await _enrich_with_rt_data(result, "tv")
         return result
     except HTTPException:
         raise
