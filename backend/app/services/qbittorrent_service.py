@@ -1,7 +1,8 @@
 """qBittorrent Web API service."""
 from typing import List, Optional, Dict
 import httpx
-from app.config import get_settings
+from sqlalchemy.orm import Session
+from app.services.config_service import get_config
 from app.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -9,8 +10,11 @@ logger = get_logger(__name__)
 class QBittorrentService:
     """Service to interact with qBittorrent Web API."""
     
-    def __init__(self):
-        self.settings = get_settings()
+    def __init__(self, db: Session | None = None):
+        self.db = db
+        self.host = get_config("qbittorrent_host", db, required=True)
+        self.username = get_config("qbittorrent_username", db, required=True)
+        self.password = get_config("qbittorrent_password", db, required=True)
         self.client = httpx.AsyncClient(timeout=30.0)
         self._authenticated = False
     
@@ -20,13 +24,13 @@ class QBittorrentService:
             return True
         
         try:
-            login_url = f"{self.settings.qbittorrent_host}/api/v2/auth/login"
-            logger.info("Authenticating with qBittorrent", url=login_url, username=self.settings.qbittorrent_username)
+            login_url = f"{self.host}/api/v2/auth/login"
+            logger.info("Authenticating with qBittorrent", url=login_url, username=self.username)
             response = await self.client.post(
                 login_url,
                 data={
-                    "username": self.settings.qbittorrent_username,
-                    "password": self.settings.qbittorrent_password
+                    "username": self.username,
+                    "password": self.password
                 }
             )
             logger.info("qBittorrent auth response", status=response.status_code, text=response.text)
@@ -66,7 +70,7 @@ class QBittorrentService:
             data["tags"] = tags
         
         try:
-            add_url = f"{self.settings.qbittorrent_host}/api/v2/torrents/add"
+            add_url = f"{self.host}/api/v2/torrents/add"
             
             if is_magnet:
                 data["urls"] = link
@@ -156,7 +160,8 @@ class QBittorrentService:
                 return None
             
             # Jackett proxy download URL format
-            proxy_url = f"{self.settings.jackett_url}/dl/{tracker_id}"
+            jackett_url = get_config("jackett_url", self.db)
+            proxy_url = f"{jackett_url}/dl/{tracker_id}"
             params = {"path": torrent_link}
             if torrent_name:
                 params["file"] = torrent_name
@@ -187,9 +192,11 @@ class QBittorrentService:
                 return None
             
             # Search Jackett for the torrent
-            search_url = f"{self.settings.jackett_url}/api/v2.0/indexers/all/results"
+            jackett_url = get_config("jackett_url", self.db)
+            jackett_api_key = get_config("jackett_api_key", self.db)
+            search_url = f"{jackett_url}/api/v2.0/indexers/all/results"
             params = {
-                "apikey": self.settings.jackett_api_key,
+                "apikey": jackett_api_key,
                 "Query": torrent_name,
             }
             
@@ -291,7 +298,7 @@ class QBittorrentService:
         
         try:
             response = await self.client.get(
-                f"{self.settings.qbittorrent_host}/api/v2/torrents/info",
+                f"{self.host}/api/v2/torrents/info",
                 params={"tag": tag}
             )
             response.raise_for_status()
@@ -308,7 +315,7 @@ class QBittorrentService:
         
         try:
             response = await self.client.get(
-                f"{self.settings.qbittorrent_host}/api/v2/torrents/info"
+                f"{self.host}/api/v2/torrents/info"
             )
             response.raise_for_status()
             return response.json()
@@ -332,7 +339,7 @@ class QBittorrentService:
         
         try:
             response = await self.client.post(
-                f"{self.settings.qbittorrent_host}/api/v2/torrents/pause",
+                f"{self.host}/api/v2/torrents/pause",
                 data={"hashes": torrent_hash}
             )
             response.raise_for_status()
@@ -361,7 +368,7 @@ class QBittorrentService:
         
         try:
             response = await self.client.post(
-                f"{self.settings.qbittorrent_host}/api/v2/torrents/resume",
+                f"{self.host}/api/v2/torrents/resume",
                 data={"hashes": torrent_hash}
             )
             response.raise_for_status()
@@ -390,7 +397,7 @@ class QBittorrentService:
         
         try:
             response = await self.client.post(
-                f"{self.settings.qbittorrent_host}/api/v2/torrents/delete",
+                f"{self.host}/api/v2/torrents/delete",
                 data={
                     "hashes": torrent_hash,
                     "deleteFiles": str(delete_files).lower()

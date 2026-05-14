@@ -4,14 +4,15 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from app.services.qbittorrent_service import QBittorrentService
+from app.models.settings import Setting
 
 @pytest.fixture
-def qb_service():
-    with patch("app.services.qbittorrent_service.get_settings") as mock_settings:
-        mock_settings.return_value.qbittorrent_host = "http://localhost:8080"
-        mock_settings.return_value.qbittorrent_username = "admin"
-        mock_settings.return_value.qbittorrent_password = "adminadmin"
-        yield QBittorrentService()
+def qb_service(db_session):
+    db_session.add(Setting(key="qbittorrent_host", value="http://localhost:8080"))
+    db_session.add(Setting(key="qbittorrent_username", value="admin"))
+    db_session.add(Setting(key="qbittorrent_password", value="adminadmin"))
+    db_session.commit()
+    return QBittorrentService(db=db_session)
 
 @pytest.mark.asyncio
 async def test_authenticate_success(qb_service):
