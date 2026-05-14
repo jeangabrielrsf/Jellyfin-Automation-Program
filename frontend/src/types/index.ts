@@ -32,6 +32,8 @@ export interface TMDBDetail {
   tagline?: string;
   display_title: string;
   year?: number;
+  rt_rating?: string;
+  rt_url?: string;
 }
 
 export interface TorrentResult {
