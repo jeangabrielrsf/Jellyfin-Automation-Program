@@ -2,13 +2,14 @@ import httpx
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from app.services.tmdb_service import TMDBService
+from app.models.settings import Setting
 
 
 @pytest.fixture
-def tmdb_service():
-    with patch("app.services.tmdb_service.get_settings") as mock_settings:
-        mock_settings.return_value.tmdb_api_key = "test-key"
-        yield TMDBService()
+def tmdb_service(db_session):
+    db_session.add(Setting(key="tmdb_api_key", value="test-key"))
+    db_session.commit()
+    return TMDBService(db=db_session)
 
 
 @pytest.mark.asyncio

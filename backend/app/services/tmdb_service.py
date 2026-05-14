@@ -1,7 +1,8 @@
 """TMDB API service."""
 import httpx
 from typing import List, Optional
-from app.config import get_settings
+from sqlalchemy.orm import Session
+from app.services.config_service import get_config
 from app.models.tmdb import TMDBSearchResult, TMDBSearchResponse, TMDBDetail
 from app.logging_config import get_logger
 
@@ -12,9 +13,9 @@ class TMDBService:
     BASE_URL = "https://api.themoviedb.org/3"
     IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500"
     
-    def __init__(self):
-        self.settings = get_settings()
-        self.api_key = self.settings.tmdb_api_key
+    def __init__(self, db: Session | None = None):
+        self.db = db
+        self.api_key = get_config("tmdb_api_key", db, required=True)
         self.client = httpx.AsyncClient(timeout=30.0)
 
     async def close(self):
