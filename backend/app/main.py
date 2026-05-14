@@ -12,6 +12,8 @@ from app.database import init_db
 from app.logging_config import setup_logging
 from app.routers import search, downloads, settings, logs, filesystem, discover
 from app.services.download_worker import DownloadWorker
+from app.exceptions import ConfigurationError
+from fastapi.responses import JSONResponse
 
 logger = setup_logging()
 
@@ -90,6 +92,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(ConfigurationError)
+async def configuration_error_handler(request, exc: ConfigurationError):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "configuration_error",
+            "key": exc.key,
+            "message": exc.message,
+        },
+    )
+
 
 app.include_router(search.router)
 app.include_router(downloads.router)
