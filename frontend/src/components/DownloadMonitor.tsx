@@ -83,7 +83,7 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
             style={{ animationDelay: `${index * 50}ms` }}
           >
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <div className="flex items-center gap-3 min-w-0">
                 <div className={`w-10 h-10 rounded-xl ${status.bg} flex items-center justify-center flex-shrink-0`}>
                   <StatusIcon className={`w-5 h-5 ${status.color}`} />
@@ -108,7 +108,7 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-2 flex-shrink-0 sm:self-auto self-end">
                 {download.status === 'downloading' && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onPause(download.id); }}

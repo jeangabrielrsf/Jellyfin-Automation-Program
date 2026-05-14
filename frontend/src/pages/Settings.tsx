@@ -41,12 +41,21 @@ const SettingsPage: React.FC = () => {
 
   useEffect(() => {
     if (currentSettings?.data) {
-      setPathValues((prev) => ({
-        ...prev,
+      const newValues = {
         movies_path: currentSettings.data.movies_path || '',
         series_path: currentSettings.data.series_path || '',
         animes_path: currentSettings.data.animes_path || '',
-      }));
+      };
+      setPathValues((prev) => {
+        if (
+          prev.movies_path === newValues.movies_path &&
+          prev.series_path === newValues.series_path &&
+          prev.animes_path === newValues.animes_path
+        ) {
+          return prev;
+        }
+        return { ...prev, ...newValues };
+      });
     }
   }, [currentSettings?.data?.movies_path, currentSettings?.data?.series_path, currentSettings?.data?.animes_path]);
 
@@ -155,7 +164,7 @@ const SettingsPage: React.FC = () => {
                         <option value="dublado">Dublado</option>
                       </select>
                     ) : (
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <input
                           type="text"
                           value={pathValues[setting.key] ?? currentValues[setting.key] ?? ''}
@@ -174,7 +183,7 @@ const SettingsPage: React.FC = () => {
                           type="button"
                           variant="outline"
                           size="default"
-                          className="shrink-0"
+                          className="shrink-0 sm:w-auto w-full"
                           onClick={() => setPickerOpen(setting.key)}
                         >
                           <Folder className="w-4 h-4 mr-1" />

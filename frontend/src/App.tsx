@@ -12,7 +12,7 @@ function App() {
   return (
     <div className="min-h-screen bg-background font-body">
       <Header />
-      <main className="container mx-auto px-6 lg:px-12 pt-24 pb-16">
+      <main className="container mx-auto px-4 sm:px-6 lg:px-12 pt-20 sm:pt-24 pb-16">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />

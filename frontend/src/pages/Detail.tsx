@@ -14,6 +14,7 @@ const DetailPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'torrents' | 'info'>('torrents');
   const [selectedSeason, setSelectedSeason] = useState<number | ''>('');
   const [selectedEpisode, setSelectedEpisode] = useState<number | 'temporada-inteira'>('temporada-inteira');
+  const [synopsisExpanded, setSynopsisExpanded] = useState(false);
   const [customSearchEnabled, setCustomSearchEnabled] = useState(false);
   const [customQuery, setCustomQuery] = useState('');
   const [searchParams] = useSearchParams();
@@ -191,9 +192,19 @@ const DetailPage: React.FC = () => {
             <p className="text-muted-foreground mt-1">
               {media.year} • {media.genres?.map((g: any) => g.name).join(', ')}
             </p>
-            <p className="text-sm text-muted-foreground mt-2 line-clamp-3">
-              {media.overview}
-            </p>
+            <div>
+              <p className={`text-sm text-muted-foreground mt-2 ${synopsisExpanded ? '' : 'line-clamp-3'}`}>
+                {media.overview}
+              </p>
+              {media.overview && media.overview.length > 150 && (
+                <button
+                  onClick={() => setSynopsisExpanded(!synopsisExpanded)}
+                  className="text-xs text-primary mt-1 hover:underline font-medium"
+                >
+                  {synopsisExpanded ? 'Ler menos' : 'Ler mais'}
+                </button>
+              )}
+            </div>
             {media.rt_rating && (
               <div className="flex items-center gap-2 mt-3">
                 <span className="text-lg">
@@ -243,7 +254,7 @@ const DetailPage: React.FC = () => {
               <h3 className="font-display text-lg font-bold text-foreground">
                 Selecionar Temporada / Episódio
               </h3>
-              <div className="flex flex-wrap gap-4 items-end">
+              <div className="flex flex-col sm:flex-row sm:items-end gap-3">
                 <div className="space-y-2">
                   <label className="text-sm text-muted-foreground">Temporada</label>
                   <select
@@ -354,7 +365,7 @@ const DetailPage: React.FC = () => {
                 Buscar Torrents
               </button>
 
-              <div className="flex items-center gap-3 pt-2 border-t border-border/30">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-2 border-t border-border/30">
                 <label className="text-sm text-muted-foreground">Tipo de conteúdo:</label>
                 <div className="flex rounded-xl border border-border/50 overflow-hidden">
                   <button
@@ -438,7 +449,9 @@ const DetailPage: React.FC = () => {
                     className="flex items-center justify-between p-4 rounded-xl bg-background/50 border border-border/30 hover:border-primary/30 transition-colors"
                   >
                     <div className="min-w-0">
-                      <p className="font-medium text-foreground truncate">{torrent.title}</p>
+                      <p className="font-medium text-foreground break-all sm:truncate" title={torrent.title}>
+                        {torrent.title}
+                      </p>
                       <p className="text-sm text-muted-foreground">
                         {torrent.quality} • {torrent.language} • {torrent.size} • {torrent.seeds}S / {torrent.peers}L
                       </p>
