@@ -122,3 +122,14 @@ async def test_build_rt_url_removes_special_chars(omdb_service):
         assert "'" not in url
         assert "," not in url
         assert "?" not in url
+
+
+@pytest.mark.asyncio
+async def test_get_by_imdb_id_false_response_returns_none(omdb_service):
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"Response": "False", "Error": "Incorrect IMDb ID."}
+    mock_response.raise_for_status = MagicMock()
+
+    with patch.object(omdb_service.client, "get", AsyncMock(return_value=mock_response)):
+        result = await omdb_service.get_by_imdb_id("tt0000000")
+        assert result is None

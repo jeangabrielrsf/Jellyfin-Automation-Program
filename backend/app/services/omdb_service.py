@@ -60,7 +60,7 @@ class OMDbService:
             if head_response.status_code == 200:
                 return slug_url
         except Exception:
-            pass
+            logger.debug("RT HEAD check failed, falling back to search", slug_url=slug_url)
 
         search_url = f"https://www.rottentomatoes.com/search?search={quote_plus(title)}"
         return search_url
@@ -70,7 +70,7 @@ class OMDbService:
         """Convert a title to a Rotten Tomatoes-compatible slug."""
         slug = title.lower()
         slug = slug.replace(" ", "_")
-        slug = re.sub(r"[^a-z0-9_]", "", slug)
+        slug = re.sub(r"[^a-z0-9_-]", "", slug)
         slug = re.sub(r"_+", "_", slug)
         slug = slug.strip("_")
         return slug
