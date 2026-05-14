@@ -88,7 +88,7 @@ export const downloadAPI = {
 
 export const settingsAPI = {
   getSettings: () => api.get('/settings'),
-  updateSetting: (key: string, value: any) =>
+  updateSetting: (key: string, value: string) =>
     api.put(`/settings/${key}`, value),
 };
 

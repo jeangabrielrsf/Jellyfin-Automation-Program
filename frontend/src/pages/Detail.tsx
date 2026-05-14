@@ -190,7 +190,7 @@ const DetailPage: React.FC = () => {
               {media.display_title}
             </h1>
             <p className="text-muted-foreground mt-1">
-              {media.year} • {media.genres?.map((g: any) => g.name).join(', ')}
+              {media.year} • {media.genres?.map((g: { name: string }) => g.name).join(', ')}
             </p>
             <div>
               <p className={`text-sm text-muted-foreground mt-2 ${synopsisExpanded ? '' : 'line-clamp-3'}`}>
@@ -266,7 +266,7 @@ const DetailPage: React.FC = () => {
                     className="px-4 py-2 rounded-xl glass bg-transparent border border-border/50 text-foreground"
                   >
                     <option value="">Selecionar...</option>
-                    {seasons.map((s: any) => (
+                    {seasons.map((s: { season_number: number; name: string; episode_count: number }) => (
                       <option key={s.season_number} value={s.season_number}>
                         {s.name} ({s.episode_count} eps)
                       </option>

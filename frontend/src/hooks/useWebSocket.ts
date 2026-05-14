@@ -3,15 +3,20 @@ import { useState, useEffect, useCallback } from 'react';
 const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000, 30000];
 const PING_INTERVAL = 30000;
 
-type Listener = (message: any) => void;
+interface WSMessage {
+  type: string;
+  data?: unknown;
+}
+
+type Listener = (message: WSMessage | null) => void;
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let pingTimer: ReturnType<typeof setInterval> | null = null;
 let reconnectAttempt = 0;
-let listeners: Set<Listener> = new Set();
+const listeners = new Set<Listener>();
 let globalReadyState: number = WebSocket.CLOSED;
-let globalLastMessage: any = null;
+let globalLastMessage: WSMessage | null = null;
 
 function notifyListeners() {
   listeners.forEach((fn) => {
@@ -109,7 +114,7 @@ function teardownConnection() {
 }
 
 export function useWebSocket() {
-  const [lastMessage, setLastMessage] = useState<any>(globalLastMessage);
+  const [lastMessage, setLastMessage] = useState<WSMessage | null>(globalLastMessage);
   const [readyState, setReadyState] = useState<number>(globalReadyState);
 
   useEffect(() => {
@@ -133,7 +138,7 @@ export function useWebSocket() {
     };
   }, []);
 
-  const sendMessage = useCallback((data: any) => {
+  const sendMessage = useCallback((data: Record<string, unknown>) => {
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(data));
     }

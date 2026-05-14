@@ -5,7 +5,22 @@ import { settingsAPI } from '../services/api';
 import { Button } from '@/components/ui/button';
 import FolderPickerDialog from '@/components/FolderPickerDialog';
 
-const settingGroups = [
+interface SettingItem {
+  key: string;
+  label: string;
+  placeholder: string;
+  sensitive?: boolean;
+  type?: string;
+}
+
+interface SettingGroup {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  settings: SettingItem[];
+}
+
+const settingGroups: SettingGroup[] = [
   {
     icon: Folder,
     title: 'Caminhos',
@@ -182,7 +197,7 @@ const SettingsPage: React.FC = () => {
                       <div className="space-y-2">
                         <div className="flex gap-2">
                           <input
-                            type={(setting as any).sensitive && !visibleFields.has(setting.key) ? 'password' : ((setting as any).type || 'text')}
+                            type={setting.sensitive && !visibleFields.has(setting.key) ? 'password' : (setting.type || 'text')}
                             value={pathValues[setting.key] ?? currentValues[setting.key] ?? ''}
                             placeholder={setting.placeholder}
                             onChange={(e) => setPathValues((prev) => ({ ...prev, [setting.key]: e.target.value }))}
@@ -195,7 +210,7 @@ const SettingsPage: React.FC = () => {
                                      font-mono text-sm
                                      transition-all duration-200"
                           />
-                          {(setting as any).sensitive ? (
+                          {setting.sensitive ? (
                             <button
                               type="button"
                               onClick={() => toggleVisibility(setting.key)}
