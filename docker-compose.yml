@@ -71,7 +71,7 @@ services:
       - ./qbittorrent/config:/config
       - ${TORRENTS_PATH:-/mnt/d/Torrents}:/downloads
     ports:
-      - "8080:8080"
+      - "8082:8080"
       - "6881:6881"
       - "6881:6881/udp"
 

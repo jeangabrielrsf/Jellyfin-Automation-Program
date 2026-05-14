@@ -9,3 +9,5 @@ dist/
 .superpowers/
 logs/
 *.log
+jackett/config/
+qbittorrent/config/

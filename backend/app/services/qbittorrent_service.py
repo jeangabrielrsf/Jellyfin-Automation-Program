@@ -34,7 +34,7 @@ class QBittorrentService:
                 }
             )
             logger.info("qBittorrent auth response", status=response.status_code, text=response.text)
-            if response.status_code == 200 and response.text == "Ok.":
+            if response.status_code in (200, 204) and response.text in ("Ok.", ""):
                 self._authenticated = True
                 logger.info("Authenticated with qBittorrent")
                 return True
