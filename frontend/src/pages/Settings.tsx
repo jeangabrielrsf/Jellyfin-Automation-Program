@@ -4,6 +4,7 @@ import { Folder, Sparkles, Save, Eye, EyeOff, Server } from 'lucide-react';
 import { settingsAPI } from '../services/api';
 import { Button } from '@/components/ui/button';
 import FolderPickerDialog from '@/components/FolderPickerDialog';
+import DiskSpaceChart from '@/components/DiskSpaceChart';
 
 interface SettingItem {
   key: string;
@@ -134,6 +135,8 @@ const SettingsPage: React.FC = () => {
           Configure os caminhos de mídia e preferências de download
         </p>
       </div>
+
+      <DiskSpaceChart />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {settingGroups.map((group) => (
