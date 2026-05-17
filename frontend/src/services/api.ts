@@ -1,4 +1,12 @@
 import axios from 'axios';
+
+export interface DiskSpaceResponse {
+  total_bytes: number;
+  free_bytes: number;
+  used_bytes: number;
+  disks_count: number;
+}
+
 // Types used implicitly by API consumers
 
 const mapMediaType = (mediaType: string): string => {
@@ -95,6 +103,7 @@ export const settingsAPI = {
 export const filesystemAPI = {
   getRoot: () => api.get('/filesystem/root'),
   getDirs: (path: string) => api.get('/filesystem/dirs', { params: { path } }),
+  getDiskSpace: () => api.get('/filesystem/disk-space/'),
 };
 
 export const logsAPI = {
