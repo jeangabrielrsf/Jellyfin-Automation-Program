@@ -1,6 +1,9 @@
-FROM alpine:3.21
+FROM debian:bookworm-slim
 
-RUN apk add --no-cache avahi
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends avahi-daemon avahi-utils && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /etc/avahi/services
 
 COPY avahi-daemon.conf /etc/avahi/avahi-daemon.conf
 COPY jellyfin.service /etc/avahi/services/jellyfin.service
