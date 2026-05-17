@@ -109,7 +109,7 @@ docker-compose logs -f backend
 
 #### 6. Acesse a aplicação
 
-- **Frontend:** http://localhost:3000
+- **Frontend:** http://localhost:3001
 - **API Docs (Swagger):** http://localhost:8000/docs
 - **Backend:** http://localhost:8000
 
@@ -419,12 +419,14 @@ Procure pelo endereço que começa com `192.168.x.x` ou `10.x.x.x`.
 
 | Serviço | Porta | URL |
 |---------|-------|-----|
-| Frontend | 3000 (Docker) / 5173 (dev) | http://localhost:3000 |
+| Frontend | 3001 (Docker) / 5173 (dev) | http://localhost:3001 |
+| Caddy | 80 | http://localhost:80 |
 | Backend API | 8000 | http://localhost:8000 |
 | API Docs | 8000/docs | http://localhost:8000/docs |
 | PostgreSQL | 5432 | localhost:5432 |
-| qBittorrent Web UI | 8080 | http://localhost:8080 |
+| qBittorrent Web UI | 8082 | http://localhost:8082 |
 | Jackett | 9117 | http://localhost:9117 |
+| FlareSolverr | 8191 | http://localhost:8191 |
 | Jellyfin | 8096 | http://localhost:8096 |
 
 ---

@@ -8,8 +8,9 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 | ------------------- | ------------------------------------------------ |
 | `backend/`          | FastAPI app, entry `app/main.py`                 |
 | `frontend/`         | React 18 + Vite + Tailwind, entry `src/main.tsx` |
-| `docs/superpowers/` | Implementation plans and specs (reference only)  |
-| `scripts/`          | `build_windows.bat` (PyInstaller)                |
+| `docs/`             | Installation guide (`INSTALL.md`) and plans/specs |
+| `docker/`           | Docker configs (Avahi mDNS container)            |
+| `scripts/`          | `build_windows.bat`, `open_firewall.ps1`, `start_jellyfin.bat` |
 
 ## Developer commands
 
@@ -37,8 +38,13 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 - **DB:** SQLAlchemy 2.0 + PostgreSQL in prod; Alembic migrations in `backend/alembic/`.
 - **Tests:** pytest + pytest-asyncio. `conftest.py` overrides `get_db` with SQLite in-memory (`StaticPool`).
 - **Logging:** Loguru + structlog. Logs written to `backend/logs/app.log` with rotation.
-- **Services:** `PathResolver` (`app/services/path_resolver.py`) computes save paths from torrent metadata; `DownloadWorker` (`app/services/download_worker.py`) monitors qBittorrent progress in a background loop; `OrganizerService` (`app/services/organizer_service.py`) moves completed downloads to library folders.
+- **Models:** `download.py`, `settings.py`, `tmdb.py`, `torrent.py`, `discover.py` in `app/models/`.
+- **Routers:** `search`, `downloads`, `settings`, `logs`, `filesystem`, `discover` in `app/routers/`.
+- **Services:** `PathResolver` (`app/services/path_resolver.py`) computes save paths from torrent metadata; `DownloadWorker` (`app/services/download_worker.py`) monitors qBittorrent progress in a background loop; `OrganizerService` (`app/services/organizer_service.py`) moves completed downloads to library folders; `DiscoverService` (`app/services/discover_service.py`) provides TMDB browse sections; `JellyfinService` (`app/services/jellyfin_service.py`) triggers library scans; `OMDBService` (`app/services/omdb_service.py`) fetches Rotten Tomatoes ratings; `PathConverter` (`app/services/path_converter.py`) converts WSL2↔Windows paths; `SettingsService` (`app/services/settings_service.py`) manages settings CRUD; `ConfigService` (`app/services/config_service.py`) provides `get_config()` with DB→.env priority chain.
+- **Scrapers:** `JackettScraper` (`app/scrapers/jackett_scraper.py`) with `BaseScraper` abstract interface.
+- **Exceptions:** `ConfigurationError` in `app/exceptions.py`.
 - **WebSocket:** `/ws` endpoint in `app/main.py` broadcasts download updates.
+- **Health:** `/health` endpoint returns app status.
 - **Static files:** `main.py` mounts `../frontend/dist` at `/` for production serving; if missing, app starts without it.
 - **Background worker:** `DownloadWorker` is started in the FastAPI lifespan and syncs qBittorrent state every 10 seconds.
 
@@ -55,6 +61,8 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 - **Proxy:** Vite dev server proxies `/api` and `/ws` to `localhost:8000`.
 - **Stack:** React Router, TanStack Query, Axios, shadcn/ui components in `src/components/ui/`.
 - **Strict TS:** `noUnusedLocals` and `noUnusedParameters` are enabled.
+- **Pages:** `Home`, `Search`, `Discover`, `Detail`, `Downloads`, `Settings`, `Logs`.
+- **Components:** `Header`, `SearchBar`, `MediaCard`, `TorrentList`, `DownloadMonitor`, `DiscoverFilterBar`, `DiscoverRow`, `FolderPickerDialog`, `ThemeToggle`, `ui/` (shadcn).
 - **UI Components:** Uses shadcn/ui components. New components should be added via `npx shadcn@latest add <component>`.
     - Dialogs/modals must use the `Dialog` component from `@/components/ui/dialog` — no custom modal implementations.
     - Toast notifications use `sonner` (`toast.success()` / `toast.error()`) — never use native `alert()`.
@@ -84,6 +92,8 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 | db | `postgres:15-alpine` | 5432 | PostgreSQL database |
 | backend | Custom build | 8000 | FastAPI app |
 | frontend | Custom build | 3001 | React + nginx |
+| caddy | `caddy:alpine` | 80 | Reverse proxy (plain HTTP) |
+| avahi | Custom build | — | mDNS for `jellyfin.local` (host network) |
 | qbittorrent | `lscr.io/linuxserver/qbittorrent` | 8082, 6881 | Torrent client (host port 8082) |
 | jackett | `lscr.io/linuxserver/jackett` | 9117 | Torrent indexer gateway |
 | flaresolverr | `ghcr.io/flaresolverr/flaresolverr` | 8191 | Cloudflare bypass for Jackett |
@@ -112,6 +122,8 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 - **OrganizerService moves files on completion:** Completed downloads are automatically organized into `MOVIES_PATH`, `SERIES_PATH`, or `ANIMES_PATH` based on media type. Ensure these paths are writable.
 - **ConfigError on missing settings:** If a required config key is missing from both DB and `.env`, the API returns HTTP 500 with `{"error": "configuration_error", "key": "...", "message": "..."}`.
 - **nginx.conf uses Docker service names:** The frontend nginx proxies to `http://backend:8000`, not `backend-host`.
+- **Caddy serves plain HTTP** on port 80 (auto-HTTPS disabled) and reverse-proxies to the frontend container.
+- **Avahi mDNS** broadcasts `jellyfin.local` on the local network via host network mode — Debian-based container (Alpine avahi-daemon crashes).
 - This project runs on WSL2.
 
 ## Running a single test

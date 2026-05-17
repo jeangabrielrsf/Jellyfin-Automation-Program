@@ -9,5 +9,8 @@ dist/
 .superpowers/
 logs/
 *.log
+logs.bak/
+logs.bak2/
 jackett/config/
 qbittorrent/config/
+adguard/

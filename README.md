@@ -43,6 +43,13 @@ O **Jellyfin Automation** permite:
                        │ HTTP / WebSocket
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
+│                        Caddy                                 │
+│                  (Reverse Proxy)                             │
+│                     Porta: 80                                │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
 │                        Backend                               │
 │            (FastAPI + SQLAlchemy + Uvicorn)                 │
 │                     Porta: 8000                              │
@@ -62,7 +69,7 @@ O **Jellyfin Automation** permite:
                                                   └──────────────┘
 ```
 
-**Nota:** qBittorrent, Jackett e FlareSolverr rodam como containers Docker. O Jellyfin permanece no Windows (serviço externo).
+**Nota:** qBittorrent, Jackett e FlareSolverr rodam como containers Docker. O Jellyfin permanece no Windows (serviço externo). Caddy atua como reverse proxy na porta 80. Avahi mDNS resolve `jellyfin.local` na rede local.
 
 ---
 
@@ -128,6 +135,7 @@ Serviços expostos:
 | Serviço | URL | Descrição |
 |---------|-----|-----------|
 | Frontend | `http://localhost:3001` | Interface web |
+| Caddy | `http://localhost:80` | Reverse proxy |
 | Backend API | `http://localhost:8000` | API REST + Swagger |
 | qBittorrent | `http://localhost:8082` | Gerenciador de torrents |
 | Jackett | `http://localhost:9117` | Indexador de torrents |
@@ -287,14 +295,20 @@ O build deve completar sem erros de TypeScript.
 |--------|----------|-----------|
 | GET | `/api/search/?q={query}` | Buscar no TMDB |
 | GET | `/api/search/torrents` | Buscar torrents via Jackett |
+| GET | `/api/discover/sections/` | Catálogo de seções Discover |
+| GET | `/api/discover/sections/{id}/` | Dados de uma seção Discover |
+| GET | `/api/discover/genres/` | Lista de gêneros TMDB |
+| GET | `/api/discover/providers/` | Lista de provedores de streaming |
 | GET | `/api/downloads/` | Listar downloads |
 | POST | `/api/downloads/` | Criar novo download |
 | DELETE | `/api/downloads/{id}` | Cancelar download |
 | POST | `/api/downloads/{id}/pause` | Pausar no qBittorrent |
 | POST | `/api/downloads/{id}/resume` | Continuar no qBittorrent |
+| GET | `/api/filesystem/browse` | Explorar sistema de arquivos |
 | GET | `/api/settings/` | Obter configurações |
 | PUT | `/api/settings/{key}` | Atualizar configuração |
 | GET | `/api/logs/` | Obter logs estruturados |
+| GET | `/health` | Health check da aplicação |
 | WS | `/ws` | WebSocket para updates em tempo real |
 
 ---
