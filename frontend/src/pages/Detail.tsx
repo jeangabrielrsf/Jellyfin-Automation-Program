@@ -5,6 +5,7 @@ import { ArrowLeft, Download, Play, Info, Search, SearchCheck, Star, Calendar } 
 import { toast } from 'sonner';
 import { searchAPI, downloadAPI } from '../services/api';
 import { TorrentResult, TVEpisode } from '../types';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const DetailPage: React.FC = () => {
   const { mediaType, id } = useParams<{ mediaType: string; id: string }>();
@@ -18,6 +19,7 @@ const DetailPage: React.FC = () => {
   const [customSearchEnabled, setCustomSearchEnabled] = useState(false);
   const [customQuery, setCustomQuery] = useState('');
   const [searchParams] = useSearchParams();
+  const [trailerOpen, setTrailerOpen] = useState(false);
 
   const isTV = mediaType === 'tv';
 
@@ -127,6 +129,17 @@ const DetailPage: React.FC = () => {
 
   const effectiveQueryWithSuffix = `${effectiveQuery}${querySuffix}`;
 
+  const trailerKey = useMemo(() => {
+    const videos = media?.videos?.results;
+    if (!videos?.length) return null;
+
+    const youtubeVideos = videos.filter((v: { site: string }) => v.site === 'YouTube');
+    const trailers = youtubeVideos.filter((v: { type: string }) => v.type === 'Trailer');
+    const teasers = youtubeVideos.filter((v: { type: string }) => v.type === 'Teaser');
+
+    return trailers[0]?.key || teasers[0]?.key || youtubeVideos[0]?.key || null;
+  }, [media]);
+
   const urlQuery = searchParams.get('q') || '';
 
   React.useEffect(() => {
@@ -186,9 +199,20 @@ const DetailPage: React.FC = () => {
             />
           )}
           <div className="flex-1">
-            <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground">
-              {media.display_title}
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground">
+                {media.display_title}
+              </h1>
+              {trailerKey && (
+                <button
+                  onClick={() => setTrailerOpen(true)}
+                  className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
+                  title="Assistir trailer"
+                >
+                  <Play className="w-5 h-5 text-primary" />
+                </button>
+              )}
+            </div>
             <p className="text-muted-foreground mt-1">
               {media.year} • {media.genres?.map((g: { name: string }) => g.name).join(', ')}
             </p>
@@ -497,6 +521,23 @@ const DetailPage: React.FC = () => {
           )}
         </div>
       )}
+
+      <Dialog open={trailerOpen} onOpenChange={setTrailerOpen}>
+        <DialogContent className="sm:max-w-[800px] p-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle>Trailer</DialogTitle>
+          </DialogHeader>
+          <div className="aspect-video">
+            <iframe
+              src={`https://www.youtube.com/embed/${trailerKey}`}
+              title="Trailer"
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
