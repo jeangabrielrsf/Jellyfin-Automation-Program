@@ -63,7 +63,7 @@ class TMDBService:
         params = {
             "api_key": self.api_key,
             "language": "pt-BR",
-            "append_to_response": "credits,external_ids"
+            "append_to_response": "credits,external_ids,videos"
         }
         
         response = await self.client.get(url, params=params)
@@ -78,7 +78,7 @@ class TMDBService:
         params = {
             "api_key": self.api_key,
             "language": "pt-BR",
-            "append_to_response": "credits,external_ids"
+            "append_to_response": "credits,external_ids,videos"
         }
 
         response = await self.client.get(url, params=params)
