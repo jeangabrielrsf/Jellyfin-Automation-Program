@@ -11,7 +11,7 @@ const DetailPage: React.FC = () => {
   const navigate = useNavigate();
   const tmdbId = Number(id);
 
-  const [activeTab, setActiveTab] = useState<'torrents' | 'info'>('torrents');
+  const [activeTab, setActiveTab] = useState<'torrents' | 'info'>('info');
   const [selectedSeason, setSelectedSeason] = useState<number | ''>('');
   const [selectedEpisode, setSelectedEpisode] = useState<number | 'temporada-inteira'>('temporada-inteira');
   const [synopsisExpanded, setSynopsisExpanded] = useState(false);
@@ -227,15 +227,6 @@ const DetailPage: React.FC = () => {
       {/* Tabs */}
       <div className="flex gap-4 border-b border-border/50">
         <button
-          onClick={() => setActiveTab('torrents')}
-          className={`pb-2 text-sm font-medium transition-colors ${
-            activeTab === 'torrents' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground'
-          }`}
-        >
-          <Play className="w-4 h-4 inline mr-1" />
-          Torrents
-        </button>
-        <button
           onClick={() => setActiveTab('info')}
           className={`pb-2 text-sm font-medium transition-colors ${
             activeTab === 'info' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground'
@@ -243,6 +234,15 @@ const DetailPage: React.FC = () => {
         >
           <Info className="w-4 h-4 inline mr-1" />
           Informações
+        </button>
+        <button
+          onClick={() => setActiveTab('torrents')}
+          className={`pb-2 text-sm font-medium transition-colors ${
+            activeTab === 'torrents' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground'
+          }`}
+        >
+          <Play className="w-4 h-4 inline mr-1" />
+          Torrents
         </button>
       </div>
 
