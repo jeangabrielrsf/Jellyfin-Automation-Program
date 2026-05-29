@@ -199,20 +199,9 @@ const DetailPage: React.FC = () => {
             />
           )}
           <div className="flex-1">
-            <div className="flex items-center gap-3">
-              <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground">
-                {media.display_title}
-              </h1>
-              {trailerKey && (
-                <button
-                  onClick={() => setTrailerOpen(true)}
-                  className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
-                  title="Assistir trailer"
-                >
-                  <Play className="w-5 h-5 text-primary" />
-                </button>
-              )}
-            </div>
+            <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground">
+              {media.display_title}
+            </h1>
             <p className="text-muted-foreground mt-1">
               {media.year} • {media.genres?.map((g: { name: string }) => g.name).join(', ')}
             </p>
@@ -244,6 +233,22 @@ const DetailPage: React.FC = () => {
                 </a>
               </div>
             )}
+            <div className="flex items-center gap-3 mt-3">
+              {trailerKey ? (
+                <button
+                  onClick={() => setTrailerOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/20 text-primary hover:bg-primary/30 transition-colors text-sm font-medium"
+                >
+                  <Play className="w-4 h-4" />
+                  Trailer
+                </button>
+              ) : (
+                <span className="flex items-center gap-2 px-4 py-2 rounded-xl bg-muted text-muted-foreground text-sm font-medium cursor-not-allowed">
+                  <Play className="w-4 h-4" />
+                  Trailer não disponível
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -523,18 +528,20 @@ const DetailPage: React.FC = () => {
       )}
 
       <Dialog open={trailerOpen} onOpenChange={setTrailerOpen}>
-        <DialogContent className="sm:max-w-[800px] p-0">
-          <DialogHeader className="p-4 pb-0">
-            <DialogTitle>Trailer</DialogTitle>
+        <DialogContent className="sm:max-w-[800px] p-0 bg-black border-none">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Trailer - {media.display_title}</DialogTitle>
           </DialogHeader>
-          <div className="aspect-video">
-            <iframe
-              src={`https://www.youtube.com/embed/${trailerKey}`}
-              title="Trailer"
-              className="w-full h-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
+          <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
+            {trailerKey && (
+              <iframe
+                src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1`}
+                className="absolute inset-0 w-full h-full"
+                allow="autoplay; encrypted-media"
+                allowFullScreen
+                title={`Trailer - ${media.display_title}`}
+              />
+            )}
           </div>
         </DialogContent>
       </Dialog>
