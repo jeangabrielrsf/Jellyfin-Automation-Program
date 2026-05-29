@@ -60,6 +60,7 @@ class TMDBDetail(BaseModel):
     rt_rating: Optional[str] = None
     rt_url: Optional[str] = None
     seasons: List[dict] = []
+    videos: Optional[dict] = None
     
     @computed_field
     @property
