@@ -34,6 +34,14 @@ export interface TMDBDetail {
   year?: number;
   rt_rating?: string;
   rt_url?: string;
+  videos?: {
+    results?: Array<{
+      key: string;
+      site: string;
+      type: string;
+      name: string;
+    }>;
+  };
 }
 
 export interface TorrentResult {
