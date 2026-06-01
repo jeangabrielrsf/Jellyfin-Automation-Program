@@ -53,5 +53,10 @@ class RecommendationService:
             similar_task = self.tmdb.get_similar_tv(tmdb_id)
             recs_task = self.tmdb.get_recommendations_tv(tmdb_id)
 
-        similar, recs = await asyncio.gather(similar_task, recs_task)
+        similar, recs = await asyncio.gather(
+            similar_task, recs_task, return_exceptions=True
+        )
+        for result in (similar, recs):
+            if isinstance(result, BaseException):
+                raise result
         return list(similar) + list(recs)
