@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { ListKind, UserMediaType, ListStatus, ListItem, Recommendation } from '@/types';
 
 export interface DiskSpaceResponse {
   total_bytes: number;
@@ -129,6 +130,34 @@ export const discoverAPI = {
   getGenres: () => api.get('/discover/genres/'),
 
   getProviders: () => api.get<Array<{ id: number; name: string; logo_path: string | null }>>('/discover/providers/'),
+};
+
+export const listsAPI = {
+  getStatus: (mediaType: UserMediaType, tmdbId: number) =>
+    api.get<ListStatus>(`/lists/status/${mediaType}/${tmdbId}/`),
+
+  add: (
+    kind: ListKind,
+    mediaType: UserMediaType,
+    tmdbId: number,
+    payload?: {
+      title: string;
+      poster_path: string | null;
+      backdrop_path: string | null;
+      year: number | null;
+    },
+  ) => api.post(`/lists/${kind}/${mediaType}/${tmdbId}/`, payload ?? null),
+
+  remove: (kind: ListKind, mediaType: UserMediaType, tmdbId: number) =>
+    api.delete(`/lists/${kind}/${mediaType}/${tmdbId}/`),
+
+  listWatchlist: () => api.get<ListItem[]>('/lists/watchlist/'),
+  listWatched: () => api.get<ListItem[]>('/lists/watched/'),
+};
+
+export const recommendationsAPI = {
+  get: (mediaType: UserMediaType, tmdbId: number, limit = 10) =>
+    api.get<Recommendation[]>(`/recommendations/${mediaType}/${tmdbId}/`, { params: { limit } }),
 };
 
 export default api;
