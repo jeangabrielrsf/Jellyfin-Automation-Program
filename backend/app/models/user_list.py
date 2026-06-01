@@ -1,5 +1,6 @@
 """UserList model — single-user watched and watchlist tracking."""
 import enum
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     CheckConstraint, Column, DateTime, Enum, Integer, String, UniqueConstraint,
@@ -7,6 +8,10 @@ from sqlalchemy import (
 from sqlalchemy.sql import func
 
 from app.database import Base
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class ListKind(str, enum.Enum):
@@ -25,8 +30,8 @@ class UserList(Base):
     poster_path = Column(String(255))
     backdrop_path = Column(String(255))
     year = Column(Integer)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), default=_utcnow, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, server_default=func.now())
 
     __table_args__ = (
         UniqueConstraint("tmdb_id", "media_type", "kind", name="uq_user_lists_tmdb_type_kind"),
