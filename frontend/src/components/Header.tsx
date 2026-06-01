@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Download, Settings, Home, FileText, Play, Compass, Menu } from 'lucide-react';
+import { Search, Download, Settings, Home, FileText, Play, Compass, Menu, Bookmark } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import {
   Sheet,
@@ -13,6 +13,7 @@ const navItems = [
   { path: '/discover', icon: Compass, label: 'Explorar' },
   { path: '/search', icon: Search, label: 'Buscar' },
   { path: '/downloads', icon: Download, label: 'Downloads' },
+  { path: '/watchlist', icon: Bookmark, label: 'Watchlist' },
   { path: '/settings', icon: Settings, label: 'Configurações' },
   { path: '/logs', icon: FileText, label: 'Logs' },
 ];
