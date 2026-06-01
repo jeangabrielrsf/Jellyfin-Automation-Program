@@ -142,3 +142,37 @@ export interface TVSeasonDetail {
   overview: string;
   episodes: TVEpisode[];
 }
+
+export type ListKind = 'watched' | 'watchlist';
+export type UserMediaType = 'movie' | 'series' | 'anime';
+
+export interface ListStatus {
+  watched: boolean;
+  watchlist: boolean;
+}
+
+export interface ListItem {
+  id: number;
+  kind: ListKind;
+  media_type: UserMediaType;
+  tmdb_id: number;
+  title: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  year: number | null;
+  created_at: string;
+}
+
+export interface Recommendation {
+  id: number;
+  title?: string;
+  name?: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  release_date?: string;
+  first_air_date?: string;
+  vote_average: number;
+  media_type: 'movie' | 'tv';
+  genre_ids: number[];
+}

@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db, SessionLocal
 from app.logging_config import setup_logging
-from app.routers import search, downloads, settings, logs, filesystem, discover
+from app.routers import search, downloads, settings, logs, filesystem, discover, lists, recommendations
 from app.services.download_worker import DownloadWorker
 from app.exceptions import ConfigurationError
 from fastapi.responses import JSONResponse
@@ -146,6 +146,8 @@ app.include_router(settings.router)
 app.include_router(logs.router)
 app.include_router(filesystem.router)
 app.include_router(discover.router)
+app.include_router(lists.router)
+app.include_router(recommendations.router)
 
 
 @app.websocket("/ws")

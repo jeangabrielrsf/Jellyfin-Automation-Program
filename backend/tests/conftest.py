@@ -29,6 +29,7 @@ def db_session():
     # Ensure models are imported so tables are registered in metadata
     from app.models.download import Download  # noqa: F401
     from app.models.settings import Setting  # noqa: F401
+    from app.models.user_list import UserList  # noqa: F401
     Base.metadata.create_all(bind=engine)
     session = TestingSessionLocal()
     try:
