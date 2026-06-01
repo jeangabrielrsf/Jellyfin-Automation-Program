@@ -98,3 +98,51 @@ class TMDBService:
         response = await self.client.get(url, params=params)
         response.raise_for_status()
         return response.json()
+
+    async def get_similar_movies(self, movie_id: int) -> list[dict]:
+        """Fetch movies similar to the given movie id."""
+        logger.info("Fetching similar movies", movie_id=movie_id)
+        url = f"{self.BASE_URL}/movie/{movie_id}/similar"
+        params = {
+            "api_key": self.api_key,
+            "language": "pt-BR",
+        }
+        response = await self.client.get(url, params=params)
+        response.raise_for_status()
+        return response.json().get("results", [])
+
+    async def get_similar_tv(self, tv_id: int) -> list[dict]:
+        """Fetch TV shows similar to the given tv id."""
+        logger.info("Fetching similar TV", tv_id=tv_id)
+        url = f"{self.BASE_URL}/tv/{tv_id}/similar"
+        params = {
+            "api_key": self.api_key,
+            "language": "pt-BR",
+        }
+        response = await self.client.get(url, params=params)
+        response.raise_for_status()
+        return response.json().get("results", [])
+
+    async def get_recommendations_movies(self, movie_id: int) -> list[dict]:
+        """Fetch TMDB-curated movie recommendations for the given movie id."""
+        logger.info("Fetching movie recommendations", movie_id=movie_id)
+        url = f"{self.BASE_URL}/movie/{movie_id}/recommendations"
+        params = {
+            "api_key": self.api_key,
+            "language": "pt-BR",
+        }
+        response = await self.client.get(url, params=params)
+        response.raise_for_status()
+        return response.json().get("results", [])
+
+    async def get_recommendations_tv(self, tv_id: int) -> list[dict]:
+        """Fetch TMDB-curated TV recommendations for the given tv id."""
+        logger.info("Fetching TV recommendations", tv_id=tv_id)
+        url = f"{self.BASE_URL}/tv/{tv_id}/recommendations"
+        params = {
+            "api_key": self.api_key,
+            "language": "pt-BR",
+        }
+        response = await self.client.get(url, params=params)
+        response.raise_for_status()
+        return response.json().get("results", [])
