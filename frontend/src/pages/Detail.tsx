@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 import { searchAPI, downloadAPI } from '../services/api';
 import { TorrentResult, TVEpisode } from '../types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { MediaActions } from '@/components/MediaActions';
+import { RecommendationsRow } from '@/components/RecommendationsRow';
 
 const DetailPage: React.FC = () => {
   const { mediaType, id } = useParams<{ mediaType: string; id: string }>();
@@ -233,7 +235,7 @@ const DetailPage: React.FC = () => {
                 </a>
               </div>
             )}
-            <div className="flex items-center gap-3 mt-3">
+            <div className="flex items-center gap-3 mt-3 flex-wrap">
               {trailerKey ? (
                 <button
                   onClick={() => setTrailerOpen(true)}
@@ -248,6 +250,14 @@ const DetailPage: React.FC = () => {
                   Trailer não disponível
                 </span>
               )}
+              <MediaActions
+                mediaType={(effectiveMediaType as 'movie' | 'series' | 'anime')}
+                tmdbId={tmdbId}
+                title={media.display_title}
+                posterPath={media.poster_path}
+                backdropPath={media.backdrop_path}
+                year={media.year ?? null}
+              />
             </div>
           </div>
         </div>
@@ -526,6 +536,11 @@ const DetailPage: React.FC = () => {
           )}
         </div>
       )}
+
+      <RecommendationsRow
+        mediaType={(effectiveMediaType as 'movie' | 'series' | 'anime')}
+        tmdbId={tmdbId}
+      />
 
       <Dialog open={trailerOpen} onOpenChange={setTrailerOpen}>
         <DialogContent className="sm:max-w-[800px] p-0 bg-black border-none">
