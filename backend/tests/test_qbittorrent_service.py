@@ -109,3 +109,41 @@ async def test_add_torrent_connection_error(mock_db, mock_config):
         
         assert result is False
         await service.close()
+
+
+@pytest.mark.asyncio
+async def test_add_torrent_duplicate_returns_success(mock_db, mock_config):
+    """Test that 409 Conflict (duplicate torrent) is treated as success."""
+    service = QBittorrentService(db=mock_db)
+    
+    # Mock authentication success
+    auth_response = MagicMock()
+    auth_response.status_code = 200
+    auth_response.text = "Ok."
+    
+    # Mock 409 Conflict response (torrent already exists)
+    conflict_response = MagicMock()
+    conflict_response.status_code = 409
+    conflict_response.text = "Conflict"
+    
+    # Create HTTPStatusError with 409
+    error = httpx.HTTPStatusError(
+        "Conflict",
+        request=MagicMock(),
+        response=conflict_response
+    )
+    
+    async def mock_post(*args, **kwargs):
+        if not service._authenticated:
+            return auth_response
+        raise error
+    
+    with patch.object(service.client, 'post', side_effect=mock_post):
+        result = await service.add_torrent(
+            magnet_link="magnet:?xt=urn:btih:1234567890abcdef1234567890abcdef12345678",
+            save_path="/tmp/test"
+        )
+        
+        # Should return True because torrent already exists
+        assert result is True
+        await service.close()

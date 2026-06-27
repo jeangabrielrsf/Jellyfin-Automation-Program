@@ -149,6 +149,12 @@ class QBittorrentService:
         except httpx.HTTPStatusError as e:
             error_body = e.response.text[:500] if e.response else "No response"
             status_code = e.response.status_code if e.response else "N/A"
+            
+            # 409 Conflict means torrent already exists in qBittorrent
+            if status_code == 409:
+                logger.info(f"Torrent already exists in qBittorrent (409 Conflict), treating as success: is_magnet={is_magnet}")
+                return True
+            
             logger.error(f"Failed to add torrent: status={status_code}, body={error_body}, is_magnet={is_magnet}")
             return False
         except httpx.HTTPError as e:
