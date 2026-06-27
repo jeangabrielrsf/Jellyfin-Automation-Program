@@ -35,7 +35,7 @@ def setup_logging() -> "loguru.Logger":
     logger.add(
         logs_dir / "app.log",
         level=settings.log_level,
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} | {message}",
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} | {message}{extra}",
         rotation="10 MB",
         retention=5,
         compression="zip",

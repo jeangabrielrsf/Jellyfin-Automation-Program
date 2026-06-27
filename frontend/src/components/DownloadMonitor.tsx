@@ -15,8 +15,8 @@ interface DownloadMonitorProps {
   downloads: DownloadType[];
   onPause: (id: number) => void;
   onResume: (id: number) => void;
-  onCancel: (id: number) => void;
-  onClear: () => void;
+  onCancel: (id: number, deleteFiles: boolean) => void;
+  onClear: (deleteFiles: boolean) => void;
 }
 
 const statusConfig: Record<string, { icon: React.ElementType; color: string; bg: string; label: string }> = {
@@ -38,6 +38,10 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
 }) => {
   const [selectedDownload, setSelectedDownload] = useState<DownloadType | null>(null);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [downloadToCancel, setDownloadToCancel] = useState<DownloadType | null>(null);
+  const [deleteFilesOnClear, setDeleteFilesOnClear] = useState(false);
+  const [deleteFilesOnCancel, setDeleteFilesOnCancel] = useState(false);
 
   const clearableCount = downloads.filter(
     (d) => d.status !== 'pending' && d.status !== 'downloading'
@@ -133,7 +137,7 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
                   </button>
                 )}
                 <button
-                  onClick={(e) => { e.stopPropagation(); onCancel(download.id); }}
+                  onClick={(e) => { e.stopPropagation(); setDownloadToCancel(download); setCancelDialogOpen(true); }}
                   className="w-9 h-9 rounded-lg glass flex items-center justify-center
                            hover:bg-red-400/10 hover:text-red-400
                            active:scale-95 transition-all duration-200"
@@ -172,7 +176,7 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
       })}
 
       {/* Clear confirmation Dialog */}
-      <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+      <Dialog open={clearDialogOpen} onOpenChange={(open) => { setClearDialogOpen(open); if (!open) setDeleteFilesOnClear(false); }}>
         <DialogContent className="glass rounded-2xl p-6 max-w-md w-full space-y-4 border-none">
           <DialogHeader>
             <DialogTitle className="font-display text-xl font-bold text-foreground">
@@ -183,21 +187,73 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
             Isso removerá {clearableCount} download{clearableCount !== 1 ? 's' : ''} concluído{clearableCount !== 1 ? 's' : ''}, falho{clearableCount !== 1 ? 's' : ''} ou cancelado{clearableCount !== 1 ? 's' : ''} do banco de dados.
             Downloads ativos não serão afetados.
           </p>
-          <p className="text-muted-foreground text-xs">
-            Os arquivos baixados serão mantidos no disco.
-          </p>
+          <label className="flex items-center gap-2 cursor-pointer select-none p-3 rounded-lg bg-muted/50 border border-border/30">
+            <input
+              type="checkbox"
+              checked={deleteFilesOnClear}
+              onChange={(e) => setDeleteFilesOnClear(e.target.checked)}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <span className="text-sm text-foreground">Deletar arquivos baixados do disco</span>
+          </label>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setClearDialogOpen(false)}>
+            <Button variant="outline" onClick={() => { setClearDialogOpen(false); setDeleteFilesOnClear(false); }}>
               Cancelar
             </Button>
             <Button
               variant="destructive"
               onClick={() => {
                 setClearDialogOpen(false);
-                onClear();
+                onClear(deleteFilesOnClear);
+                setDeleteFilesOnClear(false);
               }}
             >
               Limpar {clearableCount} download{clearableCount !== 1 ? 's' : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel confirmation Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={(open) => { setCancelDialogOpen(open); if (!open) { setDownloadToCancel(null); setDeleteFilesOnCancel(false); } }}>
+        <DialogContent className="glass rounded-2xl p-6 max-w-md w-full space-y-4 border-none">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl font-bold text-foreground">
+              Cancelar download
+            </DialogTitle>
+          </DialogHeader>
+          {downloadToCancel && (
+            <>
+              <p className="text-muted-foreground text-sm">
+                Tem certeza que deseja cancelar o download de <strong className="text-foreground">{downloadToCancel.title}</strong>?
+              </p>
+              <label className="flex items-center gap-2 cursor-pointer select-none p-3 rounded-lg bg-muted/50 border border-border/30">
+                <input
+                  type="checkbox"
+                  checked={deleteFilesOnCancel}
+                  onChange={(e) => setDeleteFilesOnCancel(e.target.checked)}
+                  className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
+                />
+                <span className="text-sm text-foreground">Deletar arquivos baixados do disco</span>
+              </label>
+            </>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setCancelDialogOpen(false); setDownloadToCancel(null); setDeleteFilesOnCancel(false); }}>
+              Voltar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (downloadToCancel) {
+                  onCancel(downloadToCancel.id, deleteFilesOnCancel);
+                }
+                setCancelDialogOpen(false);
+                setDownloadToCancel(null);
+                setDeleteFilesOnCancel(false);
+              }}
+            >
+              Cancelar download
             </Button>
           </DialogFooter>
         </DialogContent>

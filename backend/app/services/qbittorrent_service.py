@@ -140,17 +140,22 @@ class QBittorrentService:
                     files=files
                 )
             
-            logger.info("qBittorrent add response", status=response.status_code, text=response.text)
+            logger.info(f"qBittorrent add response: status={response.status_code}, text={response.text[:200]}")
             response.raise_for_status()
             
-            logger.info("Torrent added to qBittorrent successfully", link=link[:50])
+            logger.info(f"Torrent added to qBittorrent successfully: link={link[:50]}")
             return True
             
+        except httpx.HTTPStatusError as e:
+            error_body = e.response.text[:500] if e.response else "No response"
+            status_code = e.response.status_code if e.response else "N/A"
+            logger.error(f"Failed to add torrent: status={status_code}, body={error_body}, is_magnet={is_magnet}")
+            return False
         except httpx.HTTPError as e:
-            logger.error("Failed to add torrent", error=str(e), is_magnet=is_magnet, status_code=getattr(e.response, 'status_code', None) if hasattr(e, 'response') else None)
+            logger.error(f"Failed to add torrent: error={str(e)}, is_magnet={is_magnet}")
             return False
         except Exception as e:
-            logger.error("Unexpected error adding torrent", error=str(e), error_type=type(e).__name__, is_magnet=is_magnet)
+            logger.error(f"Unexpected error adding torrent: error={str(e)}, error_type={type(e).__name__}, is_magnet={is_magnet}")
             return False
     
     async def _download_torrent_via_jackett(self, torrent_link: str, tracker_id: str, torrent_name: Optional[str] = None) -> Optional[bytes]:

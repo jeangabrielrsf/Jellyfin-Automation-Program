@@ -23,30 +23,29 @@ const DownloadsPage: React.FC = () => {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: (id: number) => downloadAPI.cancelDownload(id),
+    mutationFn: ({ id, deleteFiles }: { id: number; deleteFiles: boolean }) => downloadAPI.cancelDownload(id, deleteFiles),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['downloads'] }),
   });
 
   const clearMutation = useMutation({
-    mutationFn: () => downloadAPI.clearDownloads(),
+    mutationFn: (deleteFiles: boolean) => downloadAPI.clearDownloads(deleteFiles),
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['downloads'] });
-      const result = response.data as { deleted: number; skipped: number };
-      toast.success(`${result.deleted} download(s) removido(s)`);
+      const result = response.data as { deleted: number; skipped: number; files_deleted: boolean };
+      const filesMsg = result.files_deleted ? ' (arquivos deletados)' : '';
+      toast.success(`${result.deleted} download(s) removido(s)${filesMsg}`);
     },
     onError: () => {
       toast.error('Erro ao limpar downloads');
     },
   });
 
-  const handleClear = () => clearMutation.mutate();
+  const handleClear = (deleteFiles: boolean) => clearMutation.mutate(deleteFiles);
 
   const handlePause = (id: number) => pauseMutation.mutate(id);
   const handleResume = (id: number) => resumeMutation.mutate(id);
-  const handleCancel = (id: number) => {
-    if (window.confirm('Tem certeza que deseja cancelar este download?')) {
-      cancelMutation.mutate(id);
-    }
+  const handleCancel = (id: number, deleteFiles: boolean) => {
+    cancelMutation.mutate({ id, deleteFiles });
   };
 
   if (isLoading) {

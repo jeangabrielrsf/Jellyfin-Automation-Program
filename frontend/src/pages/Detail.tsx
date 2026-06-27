@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Download, Play, Info, Search, SearchCheck, Star, Calendar } from 'lucide-react';
+import { ArrowLeft, Download, Play, Info, Search, SearchCheck, Star, Calendar, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { searchAPI, downloadAPI } from '../services/api';
 import { TorrentResult, TVEpisode } from '../types';
@@ -22,6 +22,7 @@ const DetailPage: React.FC = () => {
   const [customQuery, setCustomQuery] = useState('');
   const [searchParams] = useSearchParams();
   const [trailerOpen, setTrailerOpen] = useState(false);
+  const [downloadingTorrents, setDownloadingTorrents] = useState<Set<string>>(new Set());
 
   const isTV = mediaType === 'tv';
 
@@ -78,6 +79,10 @@ const DetailPage: React.FC = () => {
   };
 
   const handleDownload = async (torrent: TorrentResult) => {
+    const torrentKey = torrent.title + torrent.indexer;
+    if (downloadingTorrents.has(torrentKey)) return;
+    
+    setDownloadingTorrents(prev => new Set(prev).add(torrentKey));
     try {
       await downloadAPI.createDownload({
         tmdb_id: tmdbId,
@@ -99,6 +104,12 @@ const DetailPage: React.FC = () => {
     } catch (error) {
       console.error('Failed to start download:', error);
       toast.error('Erro ao iniciar download.');
+    } finally {
+      setDownloadingTorrents(prev => {
+        const next = new Set(prev);
+        next.delete(torrentKey);
+        return next;
+      });
     }
   };
 
@@ -482,28 +493,43 @@ const DetailPage: React.FC = () => {
               <div className="h-32 animate-shimmer rounded-xl" />
             ) : torrentResults?.data?.length ? (
               <div className="space-y-3">
-                {torrentResults.data.map((torrent: TorrentResult) => (
-                  <div
-                    key={torrent.title + torrent.indexer}
-                    className="flex items-center justify-between p-4 rounded-xl bg-background/50 border border-border/30 hover:border-primary/30 transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-medium text-foreground break-all sm:truncate" title={torrent.title}>
-                        {torrent.title}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {torrent.quality} • {torrent.language} • {torrent.size} • {torrent.seeds}S / {torrent.peers}L
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleDownload(torrent)}
-                      className="ml-4 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-2 shrink-0"
+                {torrentResults.data.map((torrent: TorrentResult) => {
+                  const torrentKey = torrent.title + torrent.indexer;
+                  const isDownloading = downloadingTorrents.has(torrentKey);
+                  
+                  return (
+                    <div
+                      key={torrent.title + torrent.indexer}
+                      className="flex items-center justify-between p-4 rounded-xl bg-background/50 border border-border/30 hover:border-primary/30 transition-colors"
                     >
-                      <Download className="w-4 h-4" />
-                      Baixar
-                    </button>
-                  </div>
-                ))}
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground break-all sm:truncate" title={torrent.title}>
+                          {torrent.title}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {torrent.quality} • {torrent.language} • {torrent.size} • {torrent.seeds}S / {torrent.peers}L
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleDownload(torrent)}
+                        disabled={isDownloading}
+                        className="ml-4 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shrink-0"
+                      >
+                        {isDownloading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Baixando...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-4 h-4" />
+                            Baixar
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-muted-foreground text-sm">

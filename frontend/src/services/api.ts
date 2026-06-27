@@ -82,8 +82,8 @@ export const downloadAPI = {
     media_type: mapMediaType(data.media_type),
   }),
   
-  cancelDownload: (id: number) =>
-    api.delete(`/downloads/${id}`),
+  cancelDownload: (id: number, deleteFiles?: boolean) =>
+    api.delete(`/downloads/${id}`, { params: { delete_files: deleteFiles } }),
 
   pauseDownload: (id: number) =>
     api.post(`/downloads/${id}/pause`),
@@ -91,8 +91,8 @@ export const downloadAPI = {
   resumeDownload: (id: number) =>
     api.post(`/downloads/${id}/resume`),
 
-  clearDownloads: () =>
-    api.delete('/downloads/'),
+  clearDownloads: (deleteFiles?: boolean) =>
+    api.delete('/downloads/', { params: { delete_files: deleteFiles } }),
 };
 
 export const settingsAPI = {
@@ -134,7 +134,7 @@ export const discoverAPI = {
 
 export const listsAPI = {
   getStatus: (mediaType: UserMediaType, tmdbId: number) =>
-    api.get<ListStatus>(`/lists/status/${mediaType}/${tmdbId}/`),
+    api.get<ListStatus>(`/lists/status/${mapMediaType(mediaType)}/${tmdbId}/`),
 
   add: (
     kind: ListKind,
@@ -146,10 +146,10 @@ export const listsAPI = {
       backdrop_path: string | null;
       year: number | null;
     },
-  ) => api.post(`/lists/${kind}/${mediaType}/${tmdbId}/`, payload ?? null),
+  ) => api.post(`/lists/${kind}/${mapMediaType(mediaType)}/${tmdbId}/`, payload ?? null),
 
   remove: (kind: ListKind, mediaType: UserMediaType, tmdbId: number) =>
-    api.delete(`/lists/${kind}/${mediaType}/${tmdbId}/`),
+    api.delete(`/lists/${kind}/${mapMediaType(mediaType)}/${tmdbId}/`),
 
   listWatchlist: () => api.get<ListItem[]>('/lists/watchlist/'),
   listWatched: () => api.get<ListItem[]>('/lists/watched/'),
@@ -157,7 +157,7 @@ export const listsAPI = {
 
 export const recommendationsAPI = {
   get: (mediaType: UserMediaType, tmdbId: number, limit = 10) =>
-    api.get<Recommendation[]>(`/recommendations/${mediaType}/${tmdbId}/`, { params: { limit } }),
+    api.get<Recommendation[]>(`/recommendations/${mapMediaType(mediaType)}/${tmdbId}/`, { params: { limit } }),
 };
 
 export default api;
