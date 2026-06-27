@@ -126,7 +126,7 @@ async def create_download(
         ...
         # Tag única para identificar o torrent no qBittorrent
         tag = f"jellyfin-auto-{db_download.id}"
-        success = await service.add_torrent(
+        success, already_exists = await service.add_torrent(
             magnet_link=magnet_link,
             download_url=download_url,
             category=download.media_type.value,
@@ -159,8 +159,38 @@ async def create_download(
                 db_download.status = DownloadStatus.DOWNLOADING
                 db.commit()
             db.refresh(db_download)
-            logger.info("Torrent added to qBittorrent", download_id=db_download.id, hash=db_download.torrent_hash)
-            return db_download
+            logger.info("Torrent added to qBittorrent", download_id=db_download.id, hash=db_download.torrent_hash, already_exists=already_exists)
+            
+            # Convert to dict and add already_exists field
+            response = {
+                "id": db_download.id,
+                "tmdb_id": db_download.tmdb_id,
+                "title": db_download.title,
+                "type": db_download.type.value if db_download.type else None,
+                "torrent_name": db_download.torrent_name,
+                "magnet_link": db_download.magnet_link,
+                "quality": db_download.quality,
+                "language_preference": db_download.language_preference,
+                "status": db_download.status.value if db_download.status else None,
+                "progress": db_download.progress,
+                "speed": db_download.speed,
+                "eta": db_download.eta,
+                "torrent_hash": db_download.torrent_hash,
+                "error_message": db_download.error_message,
+                "indexer_used": db_download.indexer_used,
+                "size": db_download.size,
+                "seeds": db_download.seeds,
+                "peers": db_download.peers,
+                "season": db_download.season,
+                "episode": db_download.episode,
+                "source_folder": db_download.source_folder,
+                "destination_folder": db_download.destination_folder,
+                "created_at": db_download.created_at.isoformat() if db_download.created_at else None,
+                "updated_at": db_download.updated_at.isoformat() if db_download.updated_at else None,
+                "completed_at": db_download.completed_at.isoformat() if db_download.completed_at else None,
+                "already_exists": already_exists,
+            }
+            return response
         else:
             db_download.status = DownloadStatus.FAILED
             db_download.error_message = "Failed to add torrent to qBittorrent"

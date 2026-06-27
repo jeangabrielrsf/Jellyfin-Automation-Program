@@ -84,7 +84,7 @@ const DetailPage: React.FC = () => {
     
     setDownloadingTorrents(prev => new Set(prev).add(torrentKey));
     try {
-      await downloadAPI.createDownload({
+      const response = await downloadAPI.createDownload({
         tmdb_id: tmdbId,
         title: detail?.data?.display_title || '',
         media_type: effectiveMediaType || 'movie',
@@ -100,7 +100,14 @@ const DetailPage: React.FC = () => {
         season: selectedSeason ? Number(selectedSeason) : undefined,
         episode: selectedEpisode !== 'temporada-inteira' ? Number(selectedEpisode) : undefined,
       });
-      toast.success('Download iniciado com sucesso!');
+      
+      // Check if torrent already existed in qBittorrent
+      const alreadyExists = response.data?.already_exists;
+      if (alreadyExists) {
+        toast.info('Torrent já estava na fila de downloads');
+      } else {
+        toast.success('Download iniciado com sucesso!');
+      }
     } catch (error) {
       console.error('Failed to start download:', error);
       toast.error('Erro ao iniciar download.');

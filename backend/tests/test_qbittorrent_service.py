@@ -52,12 +52,13 @@ async def test_add_torrent_logs_error_details(mock_db, mock_config):
             AsyncMock(side_effect=error)
         ]
         
-        result = await service.add_torrent(
+        success, already_exists = await service.add_torrent(
             magnet_link="magnet:?xt=urn:btih:1234567890abcdef1234567890abcdef12345678",
             save_path="/tmp/test"
         )
         
-        assert result is False
+        assert success is False
+        assert already_exists is False
         await service.close()
 
 
@@ -84,12 +85,13 @@ async def test_add_torrent_success(mock_db, mock_config):
         return success_response
     
     with patch.object(service.client, 'post', side_effect=mock_post):
-        result = await service.add_torrent(
+        success, already_exists = await service.add_torrent(
             magnet_link="magnet:?xt=urn:btih:1234567890abcdef1234567890abcdef12345678",
             save_path="/tmp/test"
         )
         
-        assert result is True
+        assert success is True
+        assert already_exists is False
         await service.close()
 
 
@@ -102,12 +104,13 @@ async def test_add_torrent_connection_error(mock_db, mock_config):
     with patch.object(service.client, 'post') as mock_post:
         mock_post.side_effect = httpx.ConnectError("Connection refused")
         
-        result = await service.add_torrent(
+        success, already_exists = await service.add_torrent(
             magnet_link="magnet:?xt=urn:btih:1234567890abcdef1234567890abcdef12345678",
             save_path="/tmp/test"
         )
         
-        assert result is False
+        assert success is False
+        assert already_exists is False
         await service.close()
 
 
@@ -139,11 +142,12 @@ async def test_add_torrent_duplicate_returns_success(mock_db, mock_config):
         raise error
     
     with patch.object(service.client, 'post', side_effect=mock_post):
-        result = await service.add_torrent(
+        success, already_exists = await service.add_torrent(
             magnet_link="magnet:?xt=urn:btih:1234567890abcdef1234567890abcdef12345678",
             save_path="/tmp/test"
         )
         
-        # Should return True because torrent already exists
-        assert result is True
+        # Should return (True, True) because torrent already exists
+        assert success is True
+        assert already_exists is True
         await service.close()

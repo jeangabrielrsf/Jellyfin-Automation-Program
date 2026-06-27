@@ -45,18 +45,24 @@ class QBittorrentService:
             logger.error("qBittorrent authentication error", error=str(e))
             return False
     
-    async def add_torrent(self, magnet_link: Optional[str] = None, download_url: Optional[str] = None, save_path: Optional[str] = None, category: Optional[str] = None, torrent_name: Optional[str] = None, tags: Optional[str] = None) -> bool:
-        """Add torrent to qBittorrent."""
+    async def add_torrent(self, magnet_link: Optional[str] = None, download_url: Optional[str] = None, save_path: Optional[str] = None, category: Optional[str] = None, torrent_name: Optional[str] = None, tags: Optional[str] = None) -> tuple[bool, bool]:
+        """Add torrent to qBittorrent.
+        
+        Returns:
+            tuple: (success: bool, already_exists: bool)
+                - success: True if torrent was added or already exists
+                - already_exists: True if torrent was already in qBittorrent (409 Conflict)
+        """
         logger.info("Adding torrent to qBittorrent", magnet_link=magnet_link[:50] if magnet_link else None, download_url=download_url[:50] if download_url else None, save_path=save_path, category=category)
         if not await self._authenticate():
             logger.error("Cannot add torrent: authentication failed")
-            return False
+            return False, False
         
         # Determine which link to use
         link = magnet_link if magnet_link else download_url
         if not link:
             logger.error("No link provided for torrent")
-            return False
+            return False, False
         
         is_magnet = link.strip().startswith("magnet:")
         
@@ -105,7 +111,7 @@ class QBittorrentService:
                                 logger.info("qBittorrent add response (fresh magnet)", status=response.status_code, text=response.text)
                                 response.raise_for_status()
                                 logger.info("Torrent added to qBittorrent successfully (fresh magnet)", link=fresh_link[:50])
-                                return True
+                                return True, False
                             else:
                                 # Try to download via Jackett proxy first, then direct link as fallback
                                 torrent_content = await self._download_torrent_via_jackett(
@@ -144,7 +150,7 @@ class QBittorrentService:
             response.raise_for_status()
             
             logger.info(f"Torrent added to qBittorrent successfully: link={link[:50]}")
-            return True
+            return True, False
             
         except httpx.HTTPStatusError as e:
             error_body = e.response.text[:500] if e.response else "No response"
@@ -153,16 +159,16 @@ class QBittorrentService:
             # 409 Conflict means torrent already exists in qBittorrent
             if status_code == 409:
                 logger.info(f"Torrent already exists in qBittorrent (409 Conflict), treating as success: is_magnet={is_magnet}")
-                return True
+                return True, True
             
             logger.error(f"Failed to add torrent: status={status_code}, body={error_body}, is_magnet={is_magnet}")
-            return False
+            return False, False
         except httpx.HTTPError as e:
             logger.error(f"Failed to add torrent: error={str(e)}, is_magnet={is_magnet}")
-            return False
+            return False, False
         except Exception as e:
             logger.error(f"Unexpected error adding torrent: error={str(e)}, error_type={type(e).__name__}, is_magnet={is_magnet}")
-            return False
+            return False, False
     
     async def _download_torrent_via_jackett(self, torrent_link: str, tracker_id: str, torrent_name: Optional[str] = None) -> Optional[bytes]:
         """Download .torrent file through Jackett's proxy download, falling back to direct download."""
