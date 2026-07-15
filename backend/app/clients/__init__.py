@@ -1,0 +1,1 @@
+"""Jackett API client adapters."""
