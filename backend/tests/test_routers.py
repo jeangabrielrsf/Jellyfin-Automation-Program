@@ -170,6 +170,128 @@ class TestSearchRouter:
             assert data[1]["season_number"] == 2
 
 
+class TestDownloadsRouterMigration:
+    """Tests verifying router uses Download model methods (issue #9)."""
+
+    def test_extract_hash_from_magnet_removed_from_router(self):
+        """_extract_hash_from_magnet should no longer exist in the router module."""
+        import app.routers.downloads as router_module
+        assert not hasattr(router_module, "_extract_hash_from_magnet")
+
+    def test_router_module_does_not_import_re(self):
+        """The router should not need 're' since hash extraction moved to model."""
+        import app.routers.downloads as router_module
+        import inspect
+        source = inspect.getsource(router_module)
+        assert "import re" not in source
+
+    def test_create_download_response_matches_to_dict(self, client, db_session):
+        """create_download response should be to_dict() + already_exists."""
+        payload = {
+            "tmdb_id": 1,
+            "title": "Dict Movie",
+            "media_type": "movie",
+            "torrent_name": "Dict.Movie.1080p",
+            "magnet_link": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+            "quality": "1080p",
+            "language_preference": "legendado",
+        }
+        with patch('app.routers.downloads.QBittorrentService') as mock_service_class:
+            mock_instance = mock_service_class.return_value
+            mock_instance.add_torrent = AsyncMock(return_value=(True, False))
+            mock_instance.close = AsyncMock()
+            response = client.post("/api/downloads/", json=payload)
+
+        assert response.status_code == 200
+        data = response.json()
+
+        expected_keys = {
+            "id", "tmdb_id", "title", "type", "season", "episode",
+            "torrent_name", "torrent_hash", "magnet_link", "quality",
+            "language_preference", "status", "progress", "speed", "eta",
+            "source_folder", "destination_folder", "indexer_used", "size",
+            "seeds", "peers", "error_message", "created_at", "updated_at",
+            "completed_at", "already_exists",
+        }
+        assert set(data.keys()) == expected_keys
+        assert data["already_exists"] is False
+
+    def test_create_download_uses_transition_to(self, client, db_session):
+        """Status changes in create_download should go through transition_to."""
+        payload = {
+            "tmdb_id": 1,
+            "title": "Transition Movie",
+            "media_type": "movie",
+            "torrent_name": "Transition.Movie.1080p",
+            "magnet_link": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+        }
+        with patch('app.routers.downloads.QBittorrentService') as mock_service_class:
+            mock_instance = mock_service_class.return_value
+            mock_instance.add_torrent = AsyncMock(return_value=(True, False))
+            mock_instance.close = AsyncMock()
+            with patch('app.routers.downloads.Download.transition_to') as mock_transition:
+                response = client.post("/api/downloads/", json=payload)
+        assert response.status_code == 200
+        mock_transition.assert_called()
+        statuses_called = [call.args[0] for call in mock_transition.call_args_list]
+        assert DownloadStatus.DOWNLOADING in statuses_called
+
+    def test_create_download_uses_extract_hash(self, client, db_session):
+        """Hash extraction should use Download.extract_hash, not the old function."""
+        payload = {
+            "tmdb_id": 1,
+            "title": "Hash Movie",
+            "media_type": "movie",
+            "torrent_name": "Hash.Movie.1080p",
+            "magnet_link": "magnet:?xt=urn:btih:ABCDEF1234567890ABCDEF1234567890ABCDEF12",
+        }
+        with patch('app.routers.downloads.QBittorrentService') as mock_service_class:
+            mock_instance = mock_service_class.return_value
+            mock_instance.add_torrent = AsyncMock(return_value=(True, False))
+            mock_instance.close = AsyncMock()
+            with patch('app.routers.downloads.Download.extract_hash', return_value="abcdef1234567890abcdef1234567890abcdef12") as mock_extract:
+                response = client.post("/api/downloads/", json=payload)
+        assert response.status_code == 200
+        mock_extract.assert_called()
+
+    def test_cancel_download_uses_transition_to(self, client, db_session):
+        """Cancel should use transition_to for status change."""
+        download = Download(
+            tmdb_id=1,
+            title="Cancel Test",
+            type=ContentType.MOVIE,
+            torrent_name="Cancel.Test",
+            status=DownloadStatus.PENDING,
+        )
+        db_session.add(download)
+        db_session.commit()
+        db_session.refresh(download)
+
+        with patch('app.routers.downloads.Download.transition_to') as mock_transition:
+            response = client.delete(f"/api/downloads/{download.id}")
+        assert response.status_code == 200
+        mock_transition.assert_called_once_with(DownloadStatus.CANCELLED)
+
+    def test_create_download_failure_uses_transition_to(self, client, db_session):
+        """Failed qBittorrent add should use transition_to(FAILED)."""
+        payload = {
+            "tmdb_id": 1,
+            "title": "Fail Movie",
+            "media_type": "movie",
+            "torrent_name": "Fail.Movie.1080p",
+            "magnet_link": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+        }
+        with patch('app.routers.downloads.QBittorrentService') as mock_service_class:
+            mock_instance = mock_service_class.return_value
+            mock_instance.add_torrent = AsyncMock(return_value=(False, False))
+            mock_instance.close = AsyncMock()
+            with patch('app.routers.downloads.Download.transition_to') as mock_transition:
+                response = client.post("/api/downloads/", json=payload)
+        assert response.status_code == 502
+        statuses_called = [call.args[0] for call in mock_transition.call_args_list]
+        assert DownloadStatus.FAILED in statuses_called
+
+
 class TestDownloadsRouter:
     """Tests for downloads endpoints."""
 

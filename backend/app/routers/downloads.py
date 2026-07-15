@@ -1,5 +1,4 @@
 """Downloads router."""
-import re
 import shutil
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -31,14 +30,6 @@ class DownloadCreate(BaseModel):
     season: Optional[int] = None
     episode: Optional[int] = None
     year: Optional[int] = None
-
-
-def _extract_hash_from_magnet(magnet_link: str) -> Optional[str]:
-    """Extract btih hash from a magnet link."""
-    match = re.search(r"xt=urn:btih:([a-fA-F0-9]{40})", magnet_link)
-    if match:
-        return match.group(1).lower()
-    return None
 
 
 @router.get("/")
@@ -135,11 +126,9 @@ async def create_download(
             tags=tag
         )
         if success:
-            # Try to extract hash from magnet link
             hash_source = magnet_link if magnet_link else download_url
-            torrent_hash = _extract_hash_from_magnet(hash_source) if hash_source and hash_source.startswith("magnet:") else None
+            torrent_hash = Download.extract_hash(hash_source) if hash_source and hash_source.startswith("magnet:") else None
             if not torrent_hash:
-                # Se não for magnet, buscar hash via tag no qBittorrent
                 try:
                     torrents = await service.get_torrents_by_tag(tag)
                     if torrents:
@@ -149,50 +138,22 @@ async def create_download(
                     logger.warning("Falha ao obter hash via tag", download_id=db_download.id, error=str(e))
             if torrent_hash:
                 db_download.torrent_hash = torrent_hash
-            db_download.status = DownloadStatus.DOWNLOADING
+            db_download.transition_to(DownloadStatus.DOWNLOADING)
             try:
                 db.commit()
             except Exception:
                 db.rollback()
-                # Torrent was already added to qBittorrent - update anyway without unique hash
                 db_download.torrent_hash = None
-                db_download.status = DownloadStatus.DOWNLOADING
+                db_download.transition_to(DownloadStatus.DOWNLOADING)
                 db.commit()
             db.refresh(db_download)
             logger.info("Torrent added to qBittorrent", download_id=db_download.id, hash=db_download.torrent_hash, already_exists=already_exists)
             
-            # Convert to dict and add already_exists field
-            response = {
-                "id": db_download.id,
-                "tmdb_id": db_download.tmdb_id,
-                "title": db_download.title,
-                "type": db_download.type.value if db_download.type else None,
-                "torrent_name": db_download.torrent_name,
-                "magnet_link": db_download.magnet_link,
-                "quality": db_download.quality,
-                "language_preference": db_download.language_preference,
-                "status": db_download.status.value if db_download.status else None,
-                "progress": db_download.progress,
-                "speed": db_download.speed,
-                "eta": db_download.eta,
-                "torrent_hash": db_download.torrent_hash,
-                "error_message": db_download.error_message,
-                "indexer_used": db_download.indexer_used,
-                "size": db_download.size,
-                "seeds": db_download.seeds,
-                "peers": db_download.peers,
-                "season": db_download.season,
-                "episode": db_download.episode,
-                "source_folder": db_download.source_folder,
-                "destination_folder": db_download.destination_folder,
-                "created_at": db_download.created_at.isoformat() if db_download.created_at else None,
-                "updated_at": db_download.updated_at.isoformat() if db_download.updated_at else None,
-                "completed_at": db_download.completed_at.isoformat() if db_download.completed_at else None,
-                "already_exists": already_exists,
-            }
+            response = db_download.to_dict()
+            response["already_exists"] = already_exists
             return response
         else:
-            db_download.status = DownloadStatus.FAILED
+            db_download.transition_to(DownloadStatus.FAILED)
             db_download.error_message = "Failed to add torrent to qBittorrent"
             db.commit()
             db.refresh(db_download)
@@ -202,7 +163,7 @@ async def create_download(
         raise
     except Exception as e:
         db.rollback()
-        db_download.status = DownloadStatus.FAILED
+        db_download.transition_to(DownloadStatus.FAILED)
         db_download.error_message = str(e)
         db.commit()
         db.refresh(db_download)
@@ -254,7 +215,7 @@ async def cancel_download(
                     logger.warning("Failed to delete folder", path=folder, error=str(e))
     
     try:
-        download.status = DownloadStatus.CANCELLED
+        download.transition_to(DownloadStatus.CANCELLED)
         db.commit()
         return {"message": "Download cancelled", "files_deleted": delete_files}
     except Exception:
