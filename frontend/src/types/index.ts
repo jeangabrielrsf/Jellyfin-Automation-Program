@@ -56,6 +56,10 @@ export interface TorrentResult {
   language?: string;
   release_group?: string;
   score: number;
+  publish_date?: string;
+  grabs?: number;
+  download_volume_factor?: number;
+  files?: number;
 }
 
 export interface Download {
@@ -175,4 +179,77 @@ export interface Recommendation {
   vote_average: number;
   media_type: 'movie' | 'tv';
   genre_ids: number[];
+}
+
+export interface TMDBSearchResponse {
+  page: number;
+  results: TMDBSearchResult[];
+  total_pages: number;
+  total_results: number;
+}
+
+export interface TVSeason {
+  season_number: number;
+  name: string;
+  episode_count: number;
+}
+
+export interface AlternativeTitle {
+  country: string;
+  title: string;
+}
+
+export interface DownloadCreateResponse extends Download {
+  already_exists?: boolean;
+  updated_at?: string;
+  completed_at?: string;
+}
+
+export interface CancelDownloadResponse {
+  message: string;
+  files_deleted: boolean;
+}
+
+export interface MessageResponse {
+  message: string;
+}
+
+export interface ClearDownloadsResponse {
+  deleted: number;
+  skipped: number;
+  files_deleted: boolean;
+}
+
+export type SettingsResponse = Record<string, string>;
+
+export interface SettingUpdateResponse {
+  key: string;
+  value: string;
+}
+
+export interface RootResponse {
+  root: string;
+}
+
+export interface DirsResponse {
+  path: string;
+  dirs: string[];
+  parent: string | null;
+}
+
+export interface DiskSpaceResponse {
+  total_bytes: number;
+  free_bytes: number;
+  used_bytes: number;
+  disks_count: number;
+}
+
+export interface LogsResponse {
+  logs: string[];
+  total: number;
+  returned: number;
+}
+
+export interface SectionCatalog {
+  sections: SectionInfo[];
 }

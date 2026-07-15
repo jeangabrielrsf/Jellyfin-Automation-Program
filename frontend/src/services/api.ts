@@ -1,14 +1,14 @@
 import axios from 'axios';
-import type { ListKind, UserMediaType, ListStatus, ListItem, Recommendation } from '@/types';
+import type {
+  ListKind, UserMediaType, ListStatus, ListItem, Recommendation,
+  TMDBSearchResponse, TMDBDetail, TVSeason, TVSeasonDetail, AlternativeTitle,
+  TorrentResult, Download, DownloadCreateResponse, CancelDownloadResponse,
+  MessageResponse, ClearDownloadsResponse, SettingsResponse, SettingUpdateResponse,
+  RootResponse, DirsResponse, DiskSpaceResponse, LogsResponse,
+  SectionCatalog, DiscoverSection, Genre, StreamingProvider,
+} from '@/types';
 
-export interface DiskSpaceResponse {
-  total_bytes: number;
-  free_bytes: number;
-  used_bytes: number;
-  disks_count: number;
-}
-
-// Types used implicitly by API consumers
+export type { DiskSpaceResponse };
 
 const mapMediaType = (mediaType: string): string => {
   if (mediaType === 'tv') return 'series';
@@ -24,19 +24,25 @@ const api = axios.create({
 
 export const searchAPI = {
   searchMedia: (query: string, page = 1) =>
-    api.get(`/search/?q=${encodeURIComponent(query)}&page=${page}`),
+    api.get<TMDBSearchResponse>(`/search/?q=${encodeURIComponent(query)}&page=${page}`),
   
   getMovieDetail: (id: number) =>
-    api.get(`/search/movie/${id}`),
+    api.get<TMDBDetail>(`/search/movie/${id}`),
   
   getTVDetail: (id: number) =>
-    api.get(`/search/tv/${id}`),
+    api.get<TMDBDetail>(`/search/tv/${id}`),
 
   getTVSeasons: (id: number) =>
-    api.get(`/search/tv/${id}/seasons`),
+    api.get<TVSeason[]>(`/search/tv/${id}/seasons`),
 
   getTVSeasonDetail: (id: number, seasonNumber: number) =>
-    api.get(`/search/tv/${id}/season/${seasonNumber}`),
+    api.get<TVSeasonDetail>(`/search/tv/${id}/season/${seasonNumber}`),
+
+  getMovieAlternativeTitles: (id: number) =>
+    api.get<AlternativeTitle[]>(`/search/movie/${id}/alternative-titles`),
+
+  getTVAlternativeTitles: (id: number) =>
+    api.get<AlternativeTitle[]>(`/search/tv/${id}/alternative-titles`),
   
   searchTorrents: (params: {
     tmdb_id: number;
@@ -54,13 +60,13 @@ export const searchAPI = {
     if (params.query) {
       apiParams.query = params.query;
     }
-    return api.get('/search/torrents', { params: apiParams });
+    return api.get<TorrentResult[]>('/search/torrents', { params: apiParams });
   },
 };
 
 export const downloadAPI = {
   listDownloads: (status?: string) =>
-    api.get('/downloads/', { params: { status } }),
+    api.get<Download[]>('/downloads/', { params: { status } }),
   
   createDownload: (data: {
     tmdb_id: number;
@@ -77,39 +83,39 @@ export const downloadAPI = {
     peers?: number;
     season?: number;
     episode?: number;
-  }) => api.post('/downloads/', {
+  }) => api.post<DownloadCreateResponse>('/downloads/', {
     ...data,
     media_type: mapMediaType(data.media_type),
   }),
   
   cancelDownload: (id: number, deleteFiles?: boolean) =>
-    api.delete(`/downloads/${id}`, { params: { delete_files: deleteFiles } }),
+    api.delete<CancelDownloadResponse>(`/downloads/${id}`, { params: { delete_files: deleteFiles } }),
 
   pauseDownload: (id: number) =>
-    api.post(`/downloads/${id}/pause`),
+    api.post<MessageResponse>(`/downloads/${id}/pause`),
 
   resumeDownload: (id: number) =>
-    api.post(`/downloads/${id}/resume`),
+    api.post<MessageResponse>(`/downloads/${id}/resume`),
 
   clearDownloads: (deleteFiles?: boolean) =>
-    api.delete('/downloads/', { params: { delete_files: deleteFiles } }),
+    api.delete<ClearDownloadsResponse>('/downloads/', { params: { delete_files: deleteFiles } }),
 };
 
 export const settingsAPI = {
-  getSettings: () => api.get('/settings'),
+  getSettings: () => api.get<SettingsResponse>('/settings'),
   updateSetting: (key: string, value: string) =>
-    api.put(`/settings/${key}`, value),
+    api.put<SettingUpdateResponse>(`/settings/${key}`, value),
 };
 
 export const filesystemAPI = {
-  getRoot: () => api.get('/filesystem/root'),
-  getDirs: (path: string) => api.get('/filesystem/dirs', { params: { path } }),
-  getDiskSpace: () => api.get('/filesystem/disk-space/'),
+  getRoot: () => api.get<RootResponse>('/filesystem/root'),
+  getDirs: (path: string) => api.get<DirsResponse>('/filesystem/dirs', { params: { path } }),
+  getDiskSpace: () => api.get<DiskSpaceResponse>('/filesystem/disk-space/'),
 };
 
 export const logsAPI = {
   getLogs: (params?: { level?: string; lines?: number; search?: string }) =>
-    api.get('/logs/', { params }),
+    api.get<LogsResponse>('/logs/', { params }),
 };
 
 export const discoverAPI = {
@@ -118,18 +124,18 @@ export const discoverAPI = {
     media_type?: string | null;
     sort_by?: string;
     watch_provider_id?: number | null;
-  }) => api.get('/discover/sections/', { params }),
+  }) => api.get<SectionCatalog>('/discover/sections/', { params }),
 
   getSection: (id: string, params?: {
     genre_id?: number | null;
     media_type?: string | null;
     sort_by?: string;
     watch_provider_id?: number | null;
-  }) => api.get(`/discover/sections/${id}/`, { params }),
+  }) => api.get<DiscoverSection>(`/discover/sections/${id}/`, { params }),
 
-  getGenres: () => api.get('/discover/genres/'),
+  getGenres: () => api.get<Genre[]>('/discover/genres/'),
 
-  getProviders: () => api.get<Array<{ id: number; name: string; logo_path: string | null }>>('/discover/providers/'),
+  getProviders: () => api.get<StreamingProvider[]>('/discover/providers/'),
 };
 
 export const listsAPI = {
@@ -146,10 +152,10 @@ export const listsAPI = {
       backdrop_path: string | null;
       year: number | null;
     },
-  ) => api.post(`/lists/${kind}/${mapMediaType(mediaType)}/${tmdbId}/`, payload ?? null),
+  ) => api.post<void>(`/lists/${kind}/${mapMediaType(mediaType)}/${tmdbId}/`, payload ?? null),
 
   remove: (kind: ListKind, mediaType: UserMediaType, tmdbId: number) =>
-    api.delete(`/lists/${kind}/${mapMediaType(mediaType)}/${tmdbId}/`),
+    api.delete<void>(`/lists/${kind}/${mapMediaType(mediaType)}/${tmdbId}/`),
 
   listWatchlist: () => api.get<ListItem[]>('/lists/watchlist/'),
   listWatched: () => api.get<ListItem[]>('/lists/watched/'),
