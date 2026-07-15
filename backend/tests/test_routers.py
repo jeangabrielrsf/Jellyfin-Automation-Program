@@ -192,7 +192,7 @@ class TestDownloadsRouter:
         }
         with patch('app.routers.downloads.QBittorrentService') as mock_service_class:
             mock_instance = mock_service_class.return_value
-            mock_instance.add_torrent = AsyncMock(return_value=True)
+            mock_instance.add_torrent = AsyncMock(return_value=(True, False))
             mock_instance.close = AsyncMock()
             response = client.post("/api/downloads/", json=payload)
         assert response.status_code == 200
@@ -219,7 +219,7 @@ class TestDownloadsRouter:
         }
         with patch('app.routers.downloads.QBittorrentService') as mock_service_class:
             mock_instance = mock_service_class.return_value
-            mock_instance.add_torrent = AsyncMock(return_value=True)
+            mock_instance.add_torrent = AsyncMock(return_value=(True, False))
             mock_instance.close = AsyncMock()
             response = client.post("/api/downloads/", json=payload)
         assert response.status_code == 200
@@ -246,7 +246,7 @@ class TestDownloadsRouter:
         }
         with patch('app.routers.downloads.QBittorrentService') as mock_service_class:
             mock_instance = mock_service_class.return_value
-            mock_instance.add_torrent = AsyncMock(return_value=True)
+            mock_instance.add_torrent = AsyncMock(return_value=(True, False))
             mock_instance.get_torrents_by_tag = AsyncMock(return_value=[
                 {"hash": "deadbeef1234567890abcdef1234567890abcdef12"}
             ])

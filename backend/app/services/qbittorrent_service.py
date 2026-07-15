@@ -2,6 +2,7 @@
 from typing import List, Optional, Dict
 import httpx
 from sqlalchemy.orm import Session
+from app.clients.jackett_client import JackettClient
 from app.services.config_service import get_config
 from app.logging_config import get_logger
 
@@ -10,13 +11,14 @@ logger = get_logger(__name__)
 class QBittorrentService:
     """Service to interact with qBittorrent Web API."""
     
-    def __init__(self, db: Session | None = None):
+    def __init__(self, db: Session | None = None, jackett_client: JackettClient | None = None):
         self.db = db
         self.host = get_config("qbittorrent_host", db, required=True)
         self.username = get_config("qbittorrent_username", db, required=True)
         self.password = get_config("qbittorrent_password", db, required=True)
         self.client = httpx.AsyncClient(timeout=30.0)
         self._authenticated = False
+        self.jackett_client = jackett_client if jackett_client is not None else JackettClient(db=db)
     
     async def _authenticate(self) -> bool:
         """Authenticate with qBittorrent."""
@@ -96,9 +98,9 @@ class QBittorrentService:
                 except httpx.HTTPError as e:
                     logger.error("Failed to download .torrent file", error=str(e), url=link[:100])
                     # If download failed, try to get a fresh link from Jackett
-                    if download_url:
+                    if download_url and self.jackett_client:
                         logger.info("Attempting to get fresh download link from Jackett")
-                        fresh_result = await self._get_fresh_jackett_link(download_url, torrent_name)
+                        fresh_result = await self.jackett_client.find_fresh_link(torrent_name)
                         if fresh_result:
                             fresh_link = fresh_result.get("link")
                             fresh_tracker = fresh_result.get("tracker_id")
@@ -114,8 +116,8 @@ class QBittorrentService:
                                 return True, False
                             else:
                                 # Try to download via Jackett proxy first, then direct link as fallback
-                                torrent_content = await self._download_torrent_via_jackett(
-                                    fresh_link, fresh_tracker, torrent_name
+                                torrent_content = await self.jackett_client.download_torrent_file(
+                                    fresh_tracker, fresh_link, torrent_name
                                 )
                                 if torrent_content:
                                     torrent_response_content = torrent_content
@@ -169,144 +171,6 @@ class QBittorrentService:
         except Exception as e:
             logger.error(f"Unexpected error adding torrent: error={str(e)}, error_type={type(e).__name__}, is_magnet={is_magnet}")
             return False, False
-    
-    async def _download_torrent_via_jackett(self, torrent_link: str, tracker_id: str, torrent_name: Optional[str] = None) -> Optional[bytes]:
-        """Download .torrent file through Jackett's proxy download, falling back to direct download."""
-        try:
-            if not tracker_id:
-                return None
-            
-            # Jackett proxy download URL format
-            jackett_url = get_config("jackett_url", self.db)
-            proxy_url = f"{jackett_url}/dl/{tracker_id}"
-            params = {"path": torrent_link}
-            if torrent_name:
-                params["file"] = torrent_name
-            
-            logger.info("Downloading .torrent via Jackett proxy", proxy_url=proxy_url, path=torrent_link[:100])
-            response = await self.client.get(proxy_url, params=params, follow_redirects=True, timeout=60.0)
-            response.raise_for_status()
-            
-            content_type = response.headers.get('content-type', '')
-            if 'text/html' in content_type or response.status_code != 200:
-                logger.warning("Jackett proxy returned non-torrent content", content_type=content_type)
-                return None
-            
-            logger.info("Downloaded .torrent via Jackett proxy successfully", size=len(response.content))
-            return response.content
-        except httpx.HTTPError as e:
-            logger.error("Jackett proxy download failed", error=str(e))
-            return None
-        except Exception as e:
-            logger.error("Unexpected error in Jackett proxy download", error=str(e))
-            return None
-    
-    async def _get_fresh_jackett_link(self, old_link: str, torrent_name: Optional[str] = None) -> Optional[dict]:
-        """Try to get a fresh download link from Jackett by searching again."""
-        try:
-            if not torrent_name:
-                logger.warning("No torrent name provided, cannot search for fresh link")
-                return None
-            
-            # Search Jackett for the torrent
-            jackett_url = get_config("jackett_url", self.db)
-            jackett_api_key = get_config("jackett_api_key", self.db)
-            search_url = f"{jackett_url}/api/v2.0/indexers/all/results"
-            params = {
-                "apikey": jackett_api_key,
-                "Query": torrent_name,
-            }
-            
-            logger.info("Searching Jackett for fresh link", torrent_name=torrent_name)
-            response = await self.client.get(search_url, params=params, timeout=60.0)
-            response.raise_for_status()
-            data = response.json()
-            
-            # Find the matching torrent (exact match first, then partial)
-            results = data.get("Results", [])
-            
-            def normalize(text):
-                """Normalize text for comparison: lowercase and replace dots with spaces."""
-                return text.lower().replace('.', ' ').replace('-', ' ').replace('_', ' ')
-            
-            normalized_torrent_name = normalize(torrent_name)
-            torrent_words = set(normalized_torrent_name.split())
-            
-            logger.info("Looking for torrent match", torrent_name=torrent_name, normalized=normalized_torrent_name, words=torrent_words, total_results=len(results))
-            
-            # Strategy: First pass - look for MagnetUri (doesn't expire) in ALL results
-            # Second pass - look for Link (expires quickly) in ALL results
-            
-            # Pass 1: Exact match with MagnetUri
-            for item in results:
-                title = item.get("Title", "")
-                normalized_title = normalize(title)
-                if normalized_title == normalized_torrent_name:
-                    magnet_uri = item.get("MagnetUri")
-                    if magnet_uri:
-                        logger.info("Found fresh magnet link for torrent (exact match)", torrent_name=torrent_name, matched_title=title)
-                        return {"link": magnet_uri, "tracker_id": None}
-            
-            # Pass 1: Word match with MagnetUri
-            for item in results:
-                title = item.get("Title", "")
-                normalized_title = normalize(title)
-                title_words = set(normalized_title.split())
-                if torrent_words.issubset(title_words):
-                    magnet_uri = item.get("MagnetUri")
-                    if magnet_uri:
-                        logger.info("Found fresh magnet link for torrent (word match)", torrent_name=torrent_name, matched_title=title)
-                        return {"link": magnet_uri, "tracker_id": None}
-            
-            # Pass 1: Substring match with MagnetUri
-            for item in results:
-                title = item.get("Title", "")
-                normalized_title = normalize(title)
-                if normalized_torrent_name in normalized_title or normalized_title in normalized_torrent_name:
-                    magnet_uri = item.get("MagnetUri")
-                    if magnet_uri:
-                        logger.info("Found fresh magnet link for torrent (substring match)", torrent_name=torrent_name, matched_title=title)
-                        return {"link": magnet_uri, "tracker_id": None}
-            
-            # Pass 2: Exact match with Link (fallback)
-            for item in results:
-                title = item.get("Title", "")
-                normalized_title = normalize(title)
-                if normalized_title == normalized_torrent_name:
-                    fresh_link = item.get("Link")
-                    if fresh_link:
-                        tracker_id = item.get("TrackerId") or item.get("Tracker")
-                        logger.info("Found fresh download link for torrent (exact match)", torrent_name=torrent_name, matched_title=title)
-                        return {"link": fresh_link, "tracker_id": tracker_id}
-            
-            # Pass 2: Word match with Link (fallback)
-            for item in results:
-                title = item.get("Title", "")
-                normalized_title = normalize(title)
-                title_words = set(normalized_title.split())
-                if torrent_words.issubset(title_words):
-                    fresh_link = item.get("Link")
-                    if fresh_link:
-                        tracker_id = item.get("TrackerId") or item.get("Tracker")
-                        logger.info("Found fresh download link for torrent (word match)", torrent_name=torrent_name, matched_title=title)
-                        return {"link": fresh_link, "tracker_id": tracker_id}
-            
-            # Pass 2: Substring match with Link (fallback)
-            for item in results:
-                title = item.get("Title", "")
-                normalized_title = normalize(title)
-                if normalized_torrent_name in normalized_title or normalized_title in normalized_torrent_name:
-                    fresh_link = item.get("Link")
-                    if fresh_link:
-                        tracker_id = item.get("TrackerId") or item.get("Tracker")
-                        logger.info("Found fresh download link for torrent (substring match)", torrent_name=torrent_name, matched_title=title)
-                        return {"link": fresh_link, "tracker_id": tracker_id}
-            
-            logger.warning("Could not find fresh link for torrent", torrent_name=torrent_name, results_count=len(results))
-            return None
-        except Exception as e:
-            logger.error("Failed to get fresh Jackett link", error=str(e))
-            return None
     
     async def get_torrents_by_tag(self, tag: str) -> List[Dict]:
         """Get torrents filtered by tag."""
