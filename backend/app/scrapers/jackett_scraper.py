@@ -1,14 +1,12 @@
 """Jackett scraper implementation."""
-import json
 import re
-import time
+from datetime import datetime
 from typing import List
 
-import httpx
 from app.scrapers.base import BaseScraper
+from app.clients.jackett_client import JackettClient
 from app.models.torrent import TorrentResult
 from sqlalchemy.orm import Session
-from app.services.config_service import get_config
 from app.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -19,45 +17,20 @@ class JackettScraper(BaseScraper):
     name = "jackett"
     priority = 10
     
-    def __init__(self, db: Session | None = None):
+    def __init__(self, db: Session | None = None, jackett_client: JackettClient | None = None):
         self.db = db
-        self.url = get_config("jackett_url", db, required=True)
-        self.api_key = get_config("jackett_api_key", db, required=True)
-        timeout_val = get_config("jackett_timeout", db, required=False) or "120"
-        self.timeout = timeout_val
-        self.client = httpx.AsyncClient(
-            timeout=httpx.Timeout(10.0, read=float(timeout_val))
-        )
+        self.jackett_client = jackett_client or JackettClient(db=db)
     
     async def search(self, query: str, media_type: str, quality: str = "1080p", language: str = "legendado") -> List[TorrentResult]:
         """Search for torrents via Jackett."""
         logger.info("Searching Jackett", query=query, media_type=media_type, quality=quality)
         
-        if not self.api_key:
-            logger.warning("Jackett API key not configured")
-            return []
-        
-        url = f"{self.url}/api/v2.0/indexers/all/results"
-        params = {
-            "apikey": self.api_key,
-            "Query": query,
-            "Category": self._get_category(media_type)
-        }
-        
-        logger.debug("Jackett request", url=url, params={"Query": query, "Category": params["Category"]})
-        
         try:
-            start = time.time()
-            response = await self.client.get(url, params=params)
-            elapsed = time.time() - start
-            
-            logger.debug("Jackett response", status_code=response.status_code, elapsed=f"{elapsed:.2f}s")
-            
-            response.raise_for_status()
-            data = response.json()
+            category = self._get_category(media_type)
+            raw_results = await self.jackett_client.search(query, category=category)
             
             results = []
-            for item in data.get("Results", []):
+            for item in raw_results:
                 torrent = TorrentResult(
                     title=item.get("Title", ""),
                     indexer=f"Jackett ({item.get('Tracker', 'Unknown')})",
@@ -68,7 +41,11 @@ class JackettScraper(BaseScraper):
                     magnet_url=item.get("MagnetUri", None),
                     quality=self._extract_quality(item.get("Title", "")),
                     language=self._extract_language(item.get("Title", "")),
-                    release_group=self._extract_release_group(item.get("Title", ""))
+                    release_group=self._extract_release_group(item.get("Title", "")),
+                    publish_date=self._parse_date(item.get("PublishDate")),
+                    grabs=item.get("Grabs"),
+                    download_volume_factor=item.get("DownloadVolumeFactor"),
+                    files=item.get("Files")
                 )
                 torrent.score = self.calculate_score(torrent, quality, language)
                 results.append(torrent)
@@ -78,41 +55,9 @@ class JackettScraper(BaseScraper):
             logger.info("Jackett search completed", results_count=len(results))
             return results
             
-        except httpx.ConnectError as e:
-            logger.error(
-                "Jackett connection error — check if Jackett is running and accessible from the container",
-                url=self.url,
-                error=str(e)
-            )
-            return []
-        except httpx.TimeoutException as e:
-            logger.error(
-                "Jackett request timed out — the service may be overloaded or unreachable",
-                url=self.url,
-                timeout=self.timeout,
-                error=str(e)
-            )
-            return []
-        except httpx.HTTPStatusError as e:
-            logger.error(
-                "Jackett returned an HTTP error",
-                url=self.url,
-                status_code=e.response.status_code,
-                response_body=e.response.text[:200],
-                error=str(e)
-            )
-            return []
-        except json.JSONDecodeError as e:
-            logger.error(
-                "Failed to decode Jackett response as JSON",
-                url=self.url,
-                error=str(e)
-            )
-            return []
         except Exception as e:
             logger.error(
                 "Jackett search failed with unexpected error",
-                url=self.url,
                 error_type=type(e).__name__,
                 error=str(e)
             )
@@ -124,7 +69,7 @@ class JackettScraper(BaseScraper):
     
     async def close(self):
         """Close the HTTP client."""
-        await self.client.aclose()
+        await self.jackett_client.close()
     
     def _get_category(self, media_type: str) -> List[int]:
         """Get Jackett category IDs based on content type."""
@@ -168,3 +113,12 @@ class JackettScraper(BaseScraper):
         if match:
             return match.group(1)
         return "Unknown"
+    
+    def _parse_date(self, date_str: str | None):
+        """Parse ISO 8601 date string from Jackett."""
+        if not date_str:
+            return None
+        try:
+            return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        except (ValueError, AttributeError):
+            return None
