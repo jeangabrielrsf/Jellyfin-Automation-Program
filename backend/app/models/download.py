@@ -1,5 +1,7 @@
 """Download model."""
 import enum
+import re
+from typing import Optional
 
 from sqlalchemy import Column, Integer, String, Float, DateTime, Enum, Text
 from sqlalchemy.sql import func
@@ -20,6 +22,35 @@ class DownloadStatus(str, enum.Enum):
 
 class Download(Base):
     __tablename__ = "downloads"
+    
+    VALID_TRANSITIONS = {
+        DownloadStatus.PENDING: {
+            DownloadStatus.DOWNLOADING,
+            DownloadStatus.FAILED,
+            DownloadStatus.CANCELLED,
+            DownloadStatus.PENDING,
+        },
+        DownloadStatus.DOWNLOADING: {
+            DownloadStatus.COMPLETED,
+            DownloadStatus.FAILED,
+            DownloadStatus.CANCELLED,
+            DownloadStatus.DOWNLOADING,
+        },
+        DownloadStatus.COMPLETED: {
+            DownloadStatus.ORGANIZED,
+            DownloadStatus.FAILED,
+            DownloadStatus.COMPLETED,
+        },
+        DownloadStatus.FAILED: {
+            DownloadStatus.FAILED,
+        },
+        DownloadStatus.CANCELLED: {
+            DownloadStatus.CANCELLED,
+        },
+        DownloadStatus.ORGANIZED: {
+            DownloadStatus.ORGANIZED,
+        },
+    }
     
     id = Column(Integer, primary_key=True, index=True)
     tmdb_id = Column(Integer, nullable=False)
@@ -52,3 +83,57 @@ class Download(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     completed_at = Column(DateTime(timezone=True))
+
+    def transition_to(self, new_status: DownloadStatus) -> None:
+        """Transition to a new status if valid."""
+        if new_status not in self.VALID_TRANSITIONS.get(self.status, set()):
+            raise ValueError(f"Cannot transition from {self.status} to {new_status}")
+        self.status = new_status
+
+    @staticmethod
+    def extract_hash(magnet_link: Optional[str]) -> Optional[str]:
+        """Extract btih hash from a magnet link."""
+        if not magnet_link:
+            return None
+        match = re.search(r"xt=urn:btih:([a-fA-F0-9]{40})(?:[^a-fA-F0-9]|$)", magnet_link)
+        if match:
+            return match.group(1).lower()
+        return None
+
+    def is_active(self) -> bool:
+        """Check if download is in an active state."""
+        return self.status in {
+            DownloadStatus.PENDING,
+            DownloadStatus.DOWNLOADING,
+            DownloadStatus.COMPLETED,
+        }
+
+    def to_dict(self) -> dict:
+        """Serialize Download to a dict."""
+        return {
+            "id": self.id,
+            "tmdb_id": self.tmdb_id,
+            "title": self.title,
+            "type": self.type.value if self.type else None,
+            "season": self.season,
+            "episode": self.episode,
+            "torrent_name": self.torrent_name,
+            "torrent_hash": self.torrent_hash,
+            "magnet_link": self.magnet_link,
+            "quality": self.quality,
+            "language_preference": self.language_preference,
+            "status": self.status.value if self.status else None,
+            "progress": self.progress,
+            "speed": self.speed,
+            "eta": self.eta,
+            "source_folder": self.source_folder,
+            "destination_folder": self.destination_folder,
+            "indexer_used": self.indexer_used,
+            "size": self.size,
+            "seeds": self.seeds,
+            "peers": self.peers,
+            "error_message": self.error_message,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+        }
