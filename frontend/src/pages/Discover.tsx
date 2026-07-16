@@ -1,90 +1,30 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Compass } from 'lucide-react';
 import { discoverAPI } from '../services/api';
-import { DiscoverFilterBar } from '../components/DiscoverFilterBar';
+import { DiscoverBanner } from '../components/DiscoverBanner';
 import { DiscoverRow } from '../components/DiscoverRow';
-import { DiscoverParams, SectionInfo } from '../types';
+import { SectionInfo, DiscoverParams } from '../types';
+
+const emptyFilters: DiscoverParams = {};
+
+const BannerSkeleton: React.FC = () => (
+  <div className="w-full h-[500px] md:h-[600px] rounded-xl bg-muted animate-shimmer mb-8" />
+);
 
 const DiscoverPage: React.FC = () => {
-  const [genreId, setGenreId] = useState<number | null>(null);
-  const [mediaType, setMediaType] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState('popularity.desc');
-  const [watchProviderId, setWatchProviderId] = useState<number | null>(null);
-
-  const filters: DiscoverParams = { genre_id: genreId, media_type: mediaType, sort_by: sortBy, watch_provider_id: watchProviderId };
-
   const { data: catalog, isLoading: catalogLoading, isError: catalogError } = useQuery({
-    queryKey: ['discover', 'sections', filters],
+    queryKey: ['discover', 'sections'],
     queryFn: async () => {
-      const res = await discoverAPI.getSections(filters);
+      const res = await discoverAPI.getSections();
       return res.data;
     },
-  });
-
-  const { data: genres } = useQuery({
-    queryKey: ['discover', 'genres'],
-    queryFn: async () => {
-      const res = await discoverAPI.getGenres();
-      return res.data;
-    },
-    staleTime: 60 * 60 * 1000,
-  });
-
-  const { data: providers } = useQuery({
-    queryKey: ['discover', 'providers'],
-    queryFn: async () => {
-      const res = await discoverAPI.getProviders();
-      return res.data;
-    },
-    staleTime: 60 * 60 * 1000,
   });
 
   return (
     <div className="space-y-2 animate-fade-in">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Compass className="w-5 h-5 text-primary" />
-        </div>
-        <div>
-          <h1 className="font-display text-3xl font-bold text-foreground">
-            Explorar
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Descubra novos filmes, séries e animes
-          </p>
-        </div>
-      </div>
-
-      <DiscoverFilterBar
-        genreId={genreId}
-        mediaType={mediaType}
-        watchProviderId={watchProviderId}
-        sortBy={sortBy}
-        genres={genres ?? []}
-        providers={providers ?? []}
-        onGenreChange={setGenreId}
-        onMediaTypeChange={setMediaType}
-        onWatchProviderChange={setWatchProviderId}
-        onSortChange={setSortBy}
-      />
-
-      {catalogLoading && (
-        <div className="space-y-8">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i}>
-              <div className="h-7 w-48 bg-muted rounded-md mb-3 animate-shimmer" />
-              <div className="flex gap-4 overflow-x-auto">
-                {Array.from({ length: 6 }).map((_, j) => (
-                  <div
-                    key={j}
-                    className="flex-shrink-0 w-40 aspect-[2/3] rounded-xl bg-muted animate-shimmer"
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+      {catalogLoading && <BannerSkeleton />}
+      {!catalogLoading && catalog?.banner && (
+        <DiscoverBanner media={catalog.banner} />
       )}
 
       {catalogError && (
@@ -101,16 +41,8 @@ const DiscoverPage: React.FC = () => {
         </div>
       )}
 
-      {!catalogLoading && !catalogError && catalog && catalog.sections.length === 0 && (
-        <div className="text-center py-16">
-          <p className="text-muted-foreground">
-            Nenhuma seção disponível com esses filtros
-          </p>
-        </div>
-      )}
-
-      {!catalogLoading && !catalogError && catalog && catalog.sections.map((section: SectionInfo) => (
-        <DiscoverRow key={section.id} section={section} filters={filters} />
+      {catalog && catalog.sections.map((section: SectionInfo) => (
+        <DiscoverRow key={section.id} section={section} filters={emptyFilters} />
       ))}
     </div>
   );

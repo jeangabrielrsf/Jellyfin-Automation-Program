@@ -10,6 +10,8 @@ export interface TMDBSearchResult {
   vote_average: number;
   media_type: string;
   genre_ids: number[];
+  display_title?: string;
+  year?: number;
 }
 
 export interface TMDBDetail {
