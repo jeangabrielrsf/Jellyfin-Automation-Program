@@ -25,6 +25,17 @@ const api = axios.create({
 export const searchAPI = {
   searchMedia: (query: string, page = 1) =>
     api.get<TMDBSearchResponse>(`/search/?q=${encodeURIComponent(query)}&page=${page}`),
+
+  discoverMedia: (params: {
+    media_type?: string;
+    genre_ids?: number[];
+    watch_provider_ids?: number[];
+    year_from?: number;
+    year_to?: number;
+    min_rating?: number;
+    sort_by?: string;
+    page?: number;
+  }) => api.get<TMDBSearchResponse>('/search/discover/', { params }),
   
   getMovieDetail: (id: number) =>
     api.get<TMDBDetail>(`/search/movie/${id}`),

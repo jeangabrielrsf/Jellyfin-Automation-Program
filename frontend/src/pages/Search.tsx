@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Loader2, Film, Tv, Sparkles } from 'lucide-react';
+import { Search, Loader2, Film, Tv } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { SearchResults } from '@/components/SearchResults';
+import { SearchFilters } from '@/components/SearchFilters';
 import { searchAPI } from '@/services/api';
 import { TMDBSearchResult } from '@/types';
 
@@ -35,15 +36,9 @@ const suggestions = [
     path: '/discover',
   },
   {
-    icon: Sparkles,
-    title: 'Animes da Temporada',
-    description: 'Descubra animes em destaque',
-    path: '/discover',
-  },
-  {
     icon: Tv,
-    title: 'Séries em Alta',
-    description: 'Séries mais populares agora',
+    title: 'Series em Alta',
+    description: 'Series mais populares agora',
     path: '/discover',
   },
 ];
@@ -205,11 +200,7 @@ const SearchPage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="filtros" className="mt-6">
-          <EmptyState
-            icon={<Sparkles className="w-10 h-10 text-muted-foreground" />}
-            title="Em breve"
-            description="Sistema de filtros avançado será implementado em breve"
-          />
+          <SearchFilters onMediaClick={handleMediaClick} />
         </TabsContent>
       </Tabs>
     </div>
