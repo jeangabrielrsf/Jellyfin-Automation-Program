@@ -1,7 +1,7 @@
 import React from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { DownloadMonitor } from '../components/DownloadMonitor';
+import { DownloadMonitor } from '../components/downloads';
 import { downloadAPI } from '../services/api';
 import { DownloadUpdates } from '../hooks/useDownloadUpdates';
 
@@ -10,6 +10,7 @@ const DownloadsPage: React.FC = () => {
   const { data: downloads, isLoading } = useQuery({
     queryKey: ['downloads'],
     queryFn: () => downloadAPI.listDownloads(),
+    refetchInterval: 10000,
   });
 
   const pauseMutation = useMutation({
