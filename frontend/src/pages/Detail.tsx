@@ -1,13 +1,17 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Download, Play, Info, Search, SearchCheck, Star, Calendar, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { searchAPI, downloadAPI } from '../services/api';
+import { ArrowLeft, Download, Play, Info, Search, Star, Calendar, Loader2, ChevronDown, Filter, SortAsc, SortDesc } from 'lucide-react';
+import { searchAPI } from '../services/api';
 import { TorrentResult, TVEpisode } from '../types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MediaActions } from '@/components/MediaActions';
 import { RecommendationsRow } from '@/components/RecommendationsRow';
+import { useTorrentFilters } from '@/hooks/useTorrentFilters';
+import { useDownload } from '@/hooks/useDownload';
+
+const QUALITY_OPTIONS = ['2160p', '1080p', '720p', '480p'];
+const LANGUAGE_OPTIONS = ['Legendado', 'Dublado', 'Dual Áudio'];
 
 const DetailPage: React.FC = () => {
   const { mediaType, id } = useParams<{ mediaType: string; id: string }>();
@@ -18,11 +22,8 @@ const DetailPage: React.FC = () => {
   const [selectedSeason, setSelectedSeason] = useState<number | ''>('');
   const [selectedEpisode, setSelectedEpisode] = useState<number | 'temporada-inteira'>('temporada-inteira');
   const [synopsisExpanded, setSynopsisExpanded] = useState(false);
-  const [customSearchEnabled, setCustomSearchEnabled] = useState(false);
-  const [customQuery, setCustomQuery] = useState('');
   const [searchParams] = useSearchParams();
   const [trailerOpen, setTrailerOpen] = useState(false);
-  const [downloadingTorrents, setDownloadingTorrents] = useState<Set<string>>(new Set());
 
   const isTV = mediaType === 'tv';
 
@@ -60,17 +61,52 @@ const DetailPage: React.FC = () => {
     enabled: isTV && !!tmdbId && selectedSeason !== '',
   });
 
+  const { data: alternativeTitles } = useQuery({
+    queryKey: ['alternative-titles', mediaType, tmdbId],
+    queryFn: () =>
+      mediaType === 'movie'
+        ? searchAPI.getMovieAlternativeTitles(tmdbId)
+        : searchAPI.getTVAlternativeTitles(tmdbId),
+    enabled: !!tmdbId && !!mediaType,
+  });
+
   const { data: torrentResults, isLoading: torrentsLoading, refetch: refetchTorrents } = useQuery({
-    queryKey: ['torrents', tmdbId, selectedSeason, selectedEpisode, customSearchEnabled, customQuery],
+    queryKey: ['torrents', tmdbId, selectedSeason, selectedEpisode],
     queryFn: () =>
       searchAPI.searchTorrents({
         tmdb_id: tmdbId,
         media_type: effectiveMediaType || 'movie',
         season: selectedSeason ? Number(selectedSeason) : undefined,
         episode: selectedEpisode !== 'temporada-inteira' ? Number(selectedEpisode) : undefined,
-        query: customSearchEnabled && customQuery.trim() ? customQuery.trim() : undefined,
       }),
-    enabled: !isTV, // TV torrents only load after user clicks "Buscar"
+    enabled: !isTV,
+  });
+
+  const {
+    preferredQuality, setPreferredQuality,
+    preferredLanguage, setPreferredLanguage,
+    customSearchEnabled, setCustomSearchEnabled,
+    customQuery, setCustomQuery,
+    selectedTitle, setSelectedTitle,
+    selectedQualities, setSelectedQualities,
+    selectedLanguages, setSelectedLanguages,
+    minSeeds, setMinSeeds,
+    freeleechOnly, setFreeleechOnly,
+    sortBy, setSortBy,
+    sortOrder, setSortOrder,
+    titleFilter, setTitleFilter,
+    visibleCount, setVisibleCount,
+    advancedOptionsOpen, setAdvancedOptionsOpen,
+    filteredTorrents, visibleTorrents, hasMoreTorrents,
+    PAGE_SIZE,
+  } = useTorrentFilters(torrentResults?.data || []);
+
+  const { downloadingTorrents, handleDownload } = useDownload({
+    tmdbId,
+    detail,
+    effectiveMediaType,
+    selectedSeason,
+    selectedEpisode,
   });
 
   const handleSearchTorrents = () => {
@@ -78,57 +114,16 @@ const DetailPage: React.FC = () => {
     refetchTorrents();
   };
 
-  const handleDownload = async (torrent: TorrentResult) => {
-    const torrentKey = torrent.title + torrent.indexer;
-    if (downloadingTorrents.has(torrentKey)) return;
-    
-    setDownloadingTorrents(prev => new Set(prev).add(torrentKey));
-    try {
-      const response = await downloadAPI.createDownload({
-        tmdb_id: tmdbId,
-        title: detail?.data?.display_title || '',
-        media_type: effectiveMediaType || 'movie',
-        torrent_name: torrent.title,
-        magnet_link: torrent.magnet_url || undefined,
-        download_url: torrent.download_url || undefined,
-        quality: torrent.quality || '1080p',
-        language_preference: torrent.language || 'legendado',
-        indexer_used: torrent.indexer,
-        size: torrent.size,
-        seeds: torrent.seeds,
-        peers: torrent.peers,
-        season: selectedSeason ? Number(selectedSeason) : undefined,
-        episode: selectedEpisode !== 'temporada-inteira' ? Number(selectedEpisode) : undefined,
-      });
-      
-      // Check if torrent already existed in qBittorrent
-      const alreadyExists = response.data?.already_exists;
-      if (alreadyExists) {
-        toast.info('Torrent já estava na fila de downloads');
-      } else {
-        toast.success('Download iniciado com sucesso!');
-      }
-    } catch (error) {
-      console.error('Failed to start download:', error);
-      toast.error('Erro ao iniciar download.');
-    } finally {
-      setDownloadingTorrents(prev => {
-        const next = new Set(prev);
-        next.delete(torrentKey);
-        return next;
-      });
-    }
-  };
-
   const seasons = seasonsData?.data || [];
 
   const tmdbSearchTerm = useMemo(() => {
+    if (selectedTitle) return selectedTitle;
     if (!media) return '';
     if (mediaType === 'movie') {
       return media.original_title || media.title || '';
     }
     return media.original_name || media.name || '';
-  }, [media, mediaType]);
+  }, [media, mediaType, selectedTitle]);
 
   const effectiveQuery = useMemo(() => {
     if (customSearchEnabled && customQuery.trim()) {
@@ -450,72 +445,280 @@ const DetailPage: React.FC = () => {
             </div>
           )}
 
-          {/* Search term info and custom search toggle */}
+          {/* Server-side filters */}
           <div className="glass rounded-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                {customSearchEnabled ? (
-                  <SearchCheck className="w-4 h-4 text-primary" />
-                ) : (
-                  <Search className="w-4 h-4" />
-                )}
-                <span>
-                  Buscando com:{' '}
-                  <strong className="text-foreground">{effectiveQueryWithSuffix || effectiveQuery || '—'}</strong>
-                </span>
-              </div>
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <span className="text-sm text-muted-foreground">Busca customizada</span>
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={customSearchEnabled}
-                    onChange={(e) => setCustomSearchEnabled(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-muted rounded-full peer-checked:bg-primary transition-colors" />
-                  <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-background rounded-full transition-transform peer-checked:translate-x-4 shadow-sm" />
-                </div>
-              </label>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Search className="w-4 h-4" />
+              <span>
+                Buscando com:{' '}
+                <strong className="text-foreground">{effectiveQueryWithSuffix || effectiveQuery || '—'}</strong>
+              </span>
             </div>
-            {customSearchEnabled && (
+
+            {/* Title selector */}
+            {alternativeTitles?.data && alternativeTitles.data.length > 0 && (
               <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">Termo de busca customizado</label>
-                <input
-                  type="text"
-                  value={customQuery}
-                  onChange={(e) => setCustomQuery(e.target.value)}
-                  placeholder="Digite o termo de busca desejado..."
-                  className="w-full px-4 py-2 rounded-xl glass bg-background/50 border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
-                />
+                <label className="text-sm text-muted-foreground">Título para busca</label>
+                <select
+                  value={selectedTitle}
+                  onChange={(e) => setSelectedTitle(e.target.value)}
+                  className="w-full px-4 py-2 rounded-xl glass bg-transparent border border-border/50 text-foreground"
+                >
+                  <option value="">
+                    {media?.title || media?.name || 'Título padrão'}
+                  </option>
+                  {alternativeTitles.data.map((t, idx) => (
+                    <option key={`${t.country}-${idx}`} value={t.title}>
+                      {t.title} ({t.country})
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Qualidade preferida</label>
+                <select
+                  value={preferredQuality}
+                  onChange={(e) => setPreferredQuality(e.target.value)}
+                  className="w-full px-4 py-2 rounded-xl glass bg-transparent border border-border/50 text-foreground"
+                >
+                  {QUALITY_OPTIONS.map(q => (
+                    <option key={q} value={q}>{q}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Idioma preferido</label>
+                <select
+                  value={preferredLanguage}
+                  onChange={(e) => setPreferredLanguage(e.target.value)}
+                  className="w-full px-4 py-2 rounded-xl glass bg-transparent border border-border/50 text-foreground"
+                >
+                  {LANGUAGE_OPTIONS.map(l => (
+                    <option key={l} value={l.toLowerCase()}>{l}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {!isTV && (
+              <button
+                onClick={() => refetchTorrents()}
+                className="px-6 py-2 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
+              >
+                Buscar Torrents
+              </button>
+            )}
+
+            {/* Advanced options accordion */}
+            <div className="border-t border-border/30 pt-4">
+              <button
+                onClick={() => setAdvancedOptionsOpen(!advancedOptionsOpen)}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronDown className={`w-4 h-4 transition-transform ${advancedOptionsOpen ? 'rotate-180' : ''}`} />
+                Opções avançadas
+              </button>
+              {advancedOptionsOpen && (
+                <div className="mt-4 space-y-4">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={customSearchEnabled}
+                      onChange={(e) => setCustomSearchEnabled(e.target.checked)}
+                      className="w-4 h-4 rounded border-border"
+                    />
+                    <span className="text-sm text-muted-foreground">Busca customizada</span>
+                  </label>
+                  {customSearchEnabled && (
+                    <input
+                      type="text"
+                      value={customQuery}
+                      onChange={(e) => setCustomQuery(e.target.value)}
+                      placeholder="Digite o termo de busca desejado..."
+                      className="w-full px-4 py-2 rounded-xl glass bg-background/50 border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
+          {/* Client-side filters */}
+          {torrentResults?.data && torrentResults.data.length > 0 && (
+            <div className="glass rounded-2xl p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-foreground">Refinar resultados</span>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Qualidade</label>
+                  <div className="flex flex-wrap gap-2">
+                    {QUALITY_OPTIONS.map(q => {
+                      const isSelected = selectedQualities.includes(q);
+                      return (
+                        <button
+                          key={q}
+                          onClick={() => {
+                            setSelectedQualities(prev =>
+                              isSelected ? prev.filter(x => x !== q) : [...prev, q]
+                            );
+                          }}
+                          className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                            isSelected
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-background/50 text-muted-foreground hover:text-foreground border border-border/50'
+                          }`}
+                        >
+                          {q}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Idioma</label>
+                  <div className="flex flex-wrap gap-2">
+                    {LANGUAGE_OPTIONS.map(l => {
+                      const isSelected = selectedLanguages.includes(l);
+                      return (
+                        <button
+                          key={l}
+                          onClick={() => {
+                            setSelectedLanguages(prev =>
+                              isSelected ? prev.filter(x => x !== l) : [...prev, l]
+                            );
+                          }}
+                          className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                            isSelected
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-background/50 text-muted-foreground hover:text-foreground border border-border/50'
+                          }`}
+                        >
+                          {l}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm text-muted-foreground">Seeds mínimos: {minSeeds}</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={minSeeds}
+                      onChange={(e) => setMinSeeds(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={freeleechOnly}
+                        onChange={(e) => setFreeleechOnly(e.target.checked)}
+                        className="w-4 h-4 rounded border-border"
+                      />
+                      <span className="text-sm text-muted-foreground">Apenas Freeleech</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Filtrar por título</label>
+                  <input
+                    type="text"
+                    value={titleFilter}
+                    onChange={(e) => setTitleFilter(e.target.value)}
+                    placeholder="Digite para filtrar..."
+                    className="w-full px-4 py-2 rounded-xl glass bg-background/50 border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
+                  />
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm text-muted-foreground">Ordenar por</label>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as 'score' | 'seeds' | 'date' | 'size')}
+                      className="px-4 py-2 rounded-xl glass bg-transparent border border-border/50 text-foreground"
+                    >
+                      <option value="score">Score</option>
+                      <option value="seeds">Seeds</option>
+                      <option value="date">Data</option>
+                      <option value="size">Tamanho</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                    className="mt-6 px-4 py-2 rounded-xl glass border border-border/50 text-foreground hover:bg-background/50 transition-colors"
+                  >
+                    {sortOrder === 'desc' ? <SortDesc className="w-4 h-4" /> : <SortAsc className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Torrent list */}
           <div className="glass rounded-2xl p-6">
             <h3 className="font-display text-xl font-bold text-foreground mb-4">
               Torrents disponíveis
+              {filteredTorrents.length > 0 && (
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  ({filteredTorrents.length} resultados)
+                </span>
+              )}
             </h3>
             {torrentsLoading ? (
               <div className="h-32 animate-shimmer rounded-xl" />
-            ) : torrentResults?.data?.length ? (
+            ) : filteredTorrents.length > 0 ? (
               <div className="space-y-3">
-                {torrentResults.data.map((torrent: TorrentResult) => {
+                {visibleTorrents.map((torrent: TorrentResult) => {
                   const torrentKey = torrent.title + torrent.indexer;
                   const isDownloading = downloadingTorrents.has(torrentKey);
-                  
+                  const isFreeleech = torrent.download_volume_factor === 0;
+
                   return (
                     <div
                       key={torrent.title + torrent.indexer}
                       className="flex items-center justify-between p-4 rounded-xl bg-background/50 border border-border/30 hover:border-primary/30 transition-colors"
                     >
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground break-all sm:truncate" title={torrent.title}>
-                          {torrent.title}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {torrent.quality} • {torrent.language} • {torrent.size} • {torrent.seeds}S / {torrent.peers}L
-                        </p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-foreground break-all sm:truncate" title={torrent.title}>
+                            {torrent.title}
+                          </p>
+                          {isFreeleech && (
+                            <span className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400 font-medium shrink-0">
+                              Freeleech
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1 flex-wrap">
+                          {torrent.quality && <span>{torrent.quality}</span>}
+                          {torrent.language && <span>• {torrent.language}</span>}
+                          <span>• {torrent.size}</span>
+                          <span className="text-green-400">• {torrent.seeds}S</span>
+                          <span className="text-blue-400">/ {torrent.peers}L</span>
+                          {torrent.grabs !== undefined && torrent.grabs > 0 && (
+                            <span>• {torrent.grabs} downloads</span>
+                          )}
+                          {torrent.files !== undefined && torrent.files > 0 && (
+                            <span>• {torrent.files} arquivos</span>
+                          )}
+                          {torrent.publish_date && (
+                            <span>• {new Date(torrent.publish_date).toLocaleDateString('pt-BR')}</span>
+                          )}
+                        </div>
                       </div>
                       <button
                         onClick={() => handleDownload(torrent)}
@@ -537,6 +740,14 @@ const DetailPage: React.FC = () => {
                     </div>
                   );
                 })}
+                {hasMoreTorrents && (
+                  <button
+                    onClick={() => setVisibleCount(prev => prev + PAGE_SIZE)}
+                    className="w-full py-3 rounded-xl bg-background/50 border border-border/50 text-foreground hover:bg-background/80 transition-colors"
+                  >
+                    Carregar mais ({filteredTorrents.length - visibleCount} restantes)
+                  </button>
+                )}
               </div>
             ) : (
               <p className="text-muted-foreground text-sm">
