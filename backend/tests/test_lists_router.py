@@ -29,6 +29,16 @@ def test_status_reflects_added_items(client, db_session):
     assert response.json() == {"watched": False, "watchlist": True}
 
 
+def test_series_media_type_accepted(client, db_session):
+    from app.services.list_service import ListService
+    ListService(db_session).add(
+        ListKind.WATCHLIST, "series", 42, title="Show", poster_path=None, backdrop_path=None, year=2024,
+    )
+    response = client.get("/api/lists/status/series/42/")
+    assert response.status_code == 200
+    assert response.json() == {"watched": False, "watchlist": True}
+
+
 def test_add_with_payload_creates_row(client):
     payload = {
         "title": "Inception",

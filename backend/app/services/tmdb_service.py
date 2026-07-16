@@ -146,3 +146,35 @@ class TMDBService:
         response = await self.client.get(url, params=params)
         response.raise_for_status()
         return response.json().get("results", [])
+
+    async def get_movie_alternative_titles(self, movie_id: int) -> list[dict]:
+        """Fetch alternative titles for a movie."""
+        logger.info("Fetching movie alternative titles", movie_id=movie_id)
+        url = f"{self.BASE_URL}/movie/{movie_id}/alternative_titles"
+        params = {"api_key": self.api_key}
+        response = await self.client.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        titles = []
+        for country_data in data.get("titles", []):
+            titles.append({
+                "country": country_data.get("iso_3166_1"),
+                "title": country_data.get("title")
+            })
+        return titles
+
+    async def get_tv_alternative_titles(self, tv_id: int) -> list[dict]:
+        """Fetch alternative titles for a TV show."""
+        logger.info("Fetching TV alternative titles", tv_id=tv_id)
+        url = f"{self.BASE_URL}/tv/{tv_id}/alternative_titles"
+        params = {"api_key": self.api_key}
+        response = await self.client.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        titles = []
+        for country_data in data.get("results", []):
+            titles.append({
+                "country": country_data.get("iso_3166_1"),
+                "title": country_data.get("title")
+            })
+        return titles

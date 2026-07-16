@@ -124,6 +124,10 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 - **nginx.conf uses Docker service names:** The frontend nginx proxies to `http://backend:8000`, not `backend-host`.
 - **Caddy serves plain HTTP** on port 80 (auto-HTTPS disabled) and reverse-proxies to the frontend container.
 - **Avahi mDNS** broadcasts `jellyfin.local` on the local network via host network mode — Debian-based container (Alpine avahi-daemon crashes).
+- **WSL2 mirrored mode is required** for Avahi mDNS to work. Configure `C:\Users\<user>\.wslconfig` with `[wsl2] networkingMode=mirrored firewall=false` and run `wsl --shutdown`. NAT mode (default) blocks multicast from crossing the WSL2 boundary.
+- **WSL2 mirrored mode self-to-self limitation:** the Windows host cannot reach its own external IP (e.g. `192.168.10.100`) on Docker-published ports from itself. LAN devices (phones, other PCs) work fine, but the host itself must use `127.0.0.1`. This is why the Windows `hosts` file must map `jellyfin.local` to `127.0.0.1` (not the LAN IP) for desktop access.
+- **Windows mDNS resolver is unreliable** — `EnableMDNS=1` under `HKLM:\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters` does not guarantee resolution. Use the `hosts` file as the canonical solution.
+- **PowerShell `Set-Content` on system files is destructive without admin** — it truncates the file to 0 bytes before failing access denied. Always run elevated, or use `Add-Content` / `Out-File -Append` after verifying the process is admin.
 - This project runs on WSL2.
 
 ## Running a single test
@@ -133,3 +137,17 @@ cd backend
 pytest tests/test_tmdb_service.py -v
 pytest tests/test_scrapers.py::test_jackett_search -v
 ```
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues via `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical roles with default names. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout (root `CONTEXT.md` + `docs/adr/`). See `docs/agents/domain.md`.

@@ -148,6 +148,40 @@ async def get_tv_season_detail(
     finally:
         await service.close()
 
+@router.get("/movie/{movie_id}/alternative-titles")
+async def get_movie_alternative_titles(
+    movie_id: int,
+    db: Session = Depends(get_db),
+):
+    """Get alternative titles for a movie."""
+    service = TMDBService(db=db)
+    try:
+        result = await service.get_movie_alternative_titles(movie_id)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get alternative titles: {str(e)}")
+    finally:
+        await service.close()
+
+@router.get("/tv/{tv_id}/alternative-titles")
+async def get_tv_alternative_titles(
+    tv_id: int,
+    db: Session = Depends(get_db),
+):
+    """Get alternative titles for a TV show."""
+    service = TMDBService(db=db)
+    try:
+        result = await service.get_tv_alternative_titles(tv_id)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get alternative titles: {str(e)}")
+    finally:
+        await service.close()
+
 @router.get("/torrents")
 async def search_torrents(
     tmdb_id: int = Query(...),

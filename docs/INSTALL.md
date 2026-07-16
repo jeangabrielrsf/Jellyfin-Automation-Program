@@ -413,6 +413,25 @@ ip addr show | grep "inet "
 ```
 Procure pelo endereço que começa com `192.168.x.x` ou `10.x.x.x`.
 
+### `jellyfin.local` resolve no celular mas não no PC Windows
+**Sintoma:** outros dispositivos da rede acessam `http://jellyfin.local` normalmente, mas o desktop Windows retorna "site não encontrado" / timeout.
+
+**Causa:** o resolvedor mDNS nativo do Windows (`Dnscache`) é instável. A chave de registro `HKLM:\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters\EnableMDNS=1` não garante resolução.
+
+**Solução:** adicione `jellyfin.local` ao `hosts` do Windows apontando para `127.0.0.1` (NÃO o IP da LAN):
+
+1. Abra o **PowerShell como Administrador**
+2. Execute:
+   ```powershell
+   Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" -Value "`n# Jellyfin Automation`n127.0.0.1 jellyfin.local"
+   ```
+3. Reinicie o navegador e teste `http://jellyfin.local`
+
+**Por que `127.0.0.1` e não o IP da LAN (ex: `192.168.10.100`)?**
+No WSL2 com `networkingMode=mirrored`, o host Windows **não consegue** acessar o próprio IP externo nas portas publicadas pelo Docker (limitação conhecida). O tráfego loopback funciona normalmente, então `127.0.0.1:80` chega no Caddy via WSL2 mirrored networking. Celulares e outros PCs da rede usam o IP da LAN normalmente (o mDNS do Avahi funciona para eles).
+
+**Atenção:** nunca use `Set-Content` em arquivos de sistema sem privilégio de admin — ele trunca o arquivo para 0 bytes antes de falhar com "access denied". Use sempre `Add-Content` (append) ou confirme que o shell está elevado.
+
 ---
 
 ## 🎯 Resumo das Portas

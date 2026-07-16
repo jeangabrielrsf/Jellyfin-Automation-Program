@@ -10,4 +10,4 @@ COPY jellyfin.service /etc/avahi/services/jellyfin.service
 
 EXPOSE 5353/udp
 
-CMD ["avahi-daemon", "--no-chroot", "--no-drop-root"]
+CMD ["avahi-daemon", "--no-chroot", "--debug"]

@@ -62,6 +62,8 @@ services:
   caddy:
     image: caddy:alpine
     restart: always
+    dns:
+      - 127.0.0.11
     ports:
       - "80:80"
     volumes:
@@ -72,6 +74,7 @@ services:
   avahi:
     build: ./docker/avahi
     restart: always
+    init: true
     network_mode: host
 
   qbittorrent:

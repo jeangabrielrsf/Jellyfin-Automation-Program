@@ -50,13 +50,13 @@ class OrganizerService:
         logger.info("Movie organized", title=title, destination=str(dest_path))
         return str(dest_path)
 
-    async def organize_series(self, source_path: str, title: str, season: int, episode: int, quality: str) -> str:
-        """Organize a TV episode file."""
+    async def organize_series(self, source_path: str, title: str, season: int, episode: Optional[int], quality: str) -> str:
+        """Organize a TV episode file or entire season."""
         return await asyncio.to_thread(
             self._organize_series_sync, source_path, title, season, episode, quality
         )
 
-    def _organize_series_sync(self, source_path: str, title: str, season: int, episode: int, quality: str) -> str:
+    def _organize_series_sync(self, source_path: str, title: str, season: int, episode: Optional[int], quality: str) -> str:
         source = Path(source_path)
 
         show_folder = Path(self.series_path) / self._sanitize_filename(title)
@@ -68,24 +68,32 @@ class OrganizerService:
             logger.error("No video files found", source=source_path)
             raise ValueError(f"No video files found in {source_path}")
 
-        main_file = video_files[0]
-        file_name = f"{title} - S{season:02d}E{episode:02d} - {quality}{main_file.suffix}"
-        dest_path = season_folder / self._sanitize_filename(file_name)
+        if episode is not None:
+            # Single episode
+            main_file = video_files[0]
+            file_name = f"{title} - S{season:02d}E{episode:02d} - {quality}{main_file.suffix}"
+            dest_path = season_folder / self._sanitize_filename(file_name)
+            self._move_file(main_file, dest_path)
+            self._move_subtitles(source, season_folder, f"{title} - S{season:02d}E{episode:02d}")
+            logger.info("Episode organized", title=title, season=season, episode=episode, destination=str(dest_path))
+        else:
+            # Entire season - move all video files
+            for video_file in video_files:
+                self._move_file(video_file, season_folder / video_file.name)
+            self._move_subtitles(source, season_folder, "")
+            logger.info("Season organized", title=title, season=season, destination=str(season_folder))
+            return str(season_folder)
 
-        self._move_file(main_file, dest_path)
-        self._move_subtitles(source, season_folder, f"{title} - S{season:02d}E{episode:02d}")
         self._cleanup_source(source)
-
-        logger.info("Episode organized", title=title, season=season, episode=episode, destination=str(dest_path))
         return str(dest_path)
 
-    async def organize_anime(self, source_path: str, title: str, season: int, episode: int, quality: str) -> str:
-        """Organize an anime episode file."""
+    async def organize_anime(self, source_path: str, title: str, season: int, episode: Optional[int], quality: str) -> str:
+        """Organize an anime episode file or entire season."""
         return await asyncio.to_thread(
             self._organize_anime_sync, source_path, title, season, episode, quality
         )
 
-    def _organize_anime_sync(self, source_path: str, title: str, season: int, episode: int, quality: str) -> str:
+    def _organize_anime_sync(self, source_path: str, title: str, season: int, episode: Optional[int], quality: str) -> str:
         source = Path(source_path)
 
         show_folder = Path(self.animes_path) / self._sanitize_filename(title)
@@ -97,15 +105,23 @@ class OrganizerService:
             logger.error("No video files found", source=source_path)
             raise ValueError(f"No video files found in {source_path}")
 
-        main_file = video_files[0]
-        file_name = f"{title} - S{season:02d}E{episode:02d} - {quality}{main_file.suffix}"
-        dest_path = season_folder / self._sanitize_filename(file_name)
+        if episode is not None:
+            # Single episode
+            main_file = video_files[0]
+            file_name = f"{title} - S{season:02d}E{episode:02d} - {quality}{main_file.suffix}"
+            dest_path = season_folder / self._sanitize_filename(file_name)
+            self._move_file(main_file, dest_path)
+            self._move_subtitles(source, season_folder, f"{title} - S{season:02d}E{episode:02d}")
+            logger.info("Anime episode organized", title=title, season=season, episode=episode, destination=str(dest_path))
+        else:
+            # Entire season - move all video files
+            for video_file in video_files:
+                self._move_file(video_file, season_folder / video_file.name)
+            self._move_subtitles(source, season_folder, "")
+            logger.info("Anime season organized", title=title, season=season, destination=str(season_folder))
+            return str(season_folder)
 
-        self._move_file(main_file, dest_path)
-        self._move_subtitles(source, season_folder, f"{title} - S{season:02d}E{episode:02d}")
         self._cleanup_source(source)
-
-        logger.info("Anime organized", title=title, season=season, episode=episode, destination=str(dest_path))
         return str(dest_path)
     
     def _get_video_files(self, path: Path) -> List[Path]:

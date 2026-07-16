@@ -1,5 +1,6 @@
 """Torrent Pydantic models."""
 from typing import Optional
+from datetime import datetime
 
 from pydantic import BaseModel
 
@@ -15,6 +16,10 @@ class TorrentResult(BaseModel):
     language: Optional[str] = None
     release_group: Optional[str] = None
     score: float = 0.0
+    publish_date: Optional[datetime] = None
+    grabs: Optional[int] = None
+    download_volume_factor: Optional[float] = None
+    files: Optional[int] = None
 
     class Config:
         from_attributes = True

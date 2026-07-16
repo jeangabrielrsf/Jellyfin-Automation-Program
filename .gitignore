@@ -14,3 +14,4 @@ logs.bak2/
 jackett/config/
 qbittorrent/config/
 adguard/
+/package-lock.json
