@@ -21,20 +21,20 @@ class DownloadWorker:
     # qBittorrent state → app status mapping
     STATE_MAPPING = {
         "downloading": DownloadStatus.DOWNLOADING,
-        "stalledDL": DownloadStatus.DOWNLOADING,
-        "metaDL": DownloadStatus.DOWNLOADING,
-        "pausedDL": DownloadStatus.PENDING,
-        "queuedDL": DownloadStatus.PENDING,
-        "checkingDL": DownloadStatus.PENDING,
-        "forcedDL": DownloadStatus.DOWNLOADING,
+        "stalleddl": DownloadStatus.DOWNLOADING,
+        "metadl": DownloadStatus.DOWNLOADING,
+        "pauseddl": DownloadStatus.PENDING,
+        "queueddl": DownloadStatus.PENDING,
+        "checkingdl": DownloadStatus.PENDING,
+        "forceddl": DownloadStatus.DOWNLOADING,
         "allocating": DownloadStatus.PENDING,
-        "downloadingDL": DownloadStatus.DOWNLOADING,
+        "downloadingdl": DownloadStatus.DOWNLOADING,
         "uploading": DownloadStatus.COMPLETED,
-        "stalledUP": DownloadStatus.COMPLETED,
-        "queuedUP": DownloadStatus.COMPLETED,
-        "checkingUP": DownloadStatus.COMPLETED,
-        "forcedUP": DownloadStatus.COMPLETED,
-        "pausedUP": DownloadStatus.COMPLETED,
+        "stalledup": DownloadStatus.COMPLETED,
+        "queuedup": DownloadStatus.COMPLETED,
+        "checkingup": DownloadStatus.COMPLETED,
+        "forcedup": DownloadStatus.COMPLETED,
+        "pausedup": DownloadStatus.COMPLETED,
     }
     
     async def start(self):
@@ -98,7 +98,7 @@ class DownloadWorker:
 
                     if new_status and new_status != download.status:
                         old_status = download.status
-                        download.status = new_status
+                        download.transition_to(new_status)
                         logger.info(
                             "Download status changed",
                             download_id=download.id,
@@ -117,7 +117,7 @@ class DownloadWorker:
                     if self.broadcast_callback:
                         await self.broadcast_callback({
                             "type": "download_update",
-                            "data": self._download_to_dict(download),
+                            "data": download.to_dict(),
                         })
             finally:
                 await service.close()
@@ -154,7 +154,7 @@ class DownloadWorker:
                     destination=dest_path
                 )
             elif download.type.value == "series":
-                if download.season and download.episode:
+                if download.season:
                     dest_path = await organizer.organize_series(
                         source_path=download.source_folder,
                         title=download.title,
@@ -171,11 +171,11 @@ class DownloadWorker:
                     )
                 else:
                     logger.warning(
-                        "Cannot organize series without season/episode",
+                        "Cannot organize series without season",
                         download_id=download.id
                     )
             elif download.type.value == "anime":
-                if download.season and download.episode:
+                if download.season:
                     dest_path = await organizer.organize_anime(
                         source_path=download.source_folder,
                         title=download.title,
@@ -192,12 +192,12 @@ class DownloadWorker:
                     )
                 else:
                     logger.warning(
-                        "Cannot organize anime without season/episode",
+                        "Cannot organize anime without season",
                         download_id=download.id
                     )
 
             if dest_path:
-                download.status = DownloadStatus.ORGANIZED
+                download.transition_to(DownloadStatus.ORGANIZED)
                 download.destination_folder = dest_path
                 db.commit()
 
@@ -252,33 +252,3 @@ class DownloadWorker:
             return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         else:
             return f"{minutes:02d}:{seconds:02d}"
-    
-    @staticmethod
-    def _download_to_dict(download: Download) -> dict:
-        """Serialize a Download model to a JSON-safe dict."""
-        return {
-            "id": download.id,
-            "tmdb_id": download.tmdb_id,
-            "title": download.title,
-            "type": download.type.value if download.type else None,
-            "season": download.season,
-            "episode": download.episode,
-            "torrent_name": download.torrent_name,
-            "torrent_hash": download.torrent_hash,
-            "magnet_link": download.magnet_link,
-            "quality": download.quality,
-            "language_preference": download.language_preference,
-            "status": download.status.value if download.status else None,
-            "progress": download.progress,
-            "speed": download.speed,
-            "eta": download.eta,
-            "source_folder": download.source_folder,
-            "destination_folder": download.destination_folder,
-            "indexer_used": download.indexer_used,
-            "seeds": download.seeds,
-            "peers": download.peers,
-            "error_message": download.error_message,
-            "created_at": download.created_at.isoformat() if download.created_at else None,
-            "updated_at": download.updated_at.isoformat() if download.updated_at else None,
-            "completed_at": download.completed_at.isoformat() if download.completed_at else None,
-        }

@@ -42,6 +42,9 @@ async def test_sync_progress_updates_download(mock_db, mock_qbit_service):
     mock_download = MagicMock()
     mock_download.torrent_hash = "abc123"
     mock_download.id = 1
+    mock_download.status = MagicMock()
+    mock_download.status.__ne__ = MagicMock(return_value=True)
+    mock_download.transition_to = MagicMock()
     
     with patch("app.services.download_worker.SessionLocal") as mock_session:
         mock_session.return_value = mock_db
@@ -54,10 +57,91 @@ async def test_sync_progress_updates_download(mock_db, mock_qbit_service):
     assert mock_download.progress == 0.5
     assert mock_download.speed == "1.0 MB/s"
     assert mock_download.eta == "01:00:00"
-    assert mock_download.status.value == "downloading"
     assert mock_download.seeds == 42
     assert mock_download.peers == 7
+    mock_download.transition_to.assert_called_once()
+    from app.models.download import DownloadStatus
+    assert mock_download.transition_to.call_args[0][0] == DownloadStatus.DOWNLOADING
     mock_db.commit.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_sync_progress_uses_transition_to(mock_db, mock_qbit_service):
+    """Test that sync_progress uses download.transition_to() for status changes."""
+    worker = DownloadWorker()
+    
+    mock_download = MagicMock()
+    mock_download.torrent_hash = "abc123"
+    mock_download.id = 1
+    mock_download.status = MagicMock()
+    mock_download.status.__ne__ = MagicMock(return_value=True)
+    mock_download.transition_to = MagicMock()
+    
+    with patch("app.services.download_worker.SessionLocal") as mock_session:
+        mock_session.return_value = mock_db
+        mock_db.query.return_value.filter.return_value.all.return_value = [mock_download]
+        
+        with patch("app.services.download_worker.QBittorrentService", return_value=mock_qbit_service):
+            await worker._sync_progress()
+    
+    mock_download.transition_to.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_sync_progress_uses_to_dict_for_broadcast(mock_db, mock_qbit_service):
+    """Test that sync_progress uses download.to_dict() for WebSocket broadcasts."""
+    worker = DownloadWorker()
+    broadcast_callback = AsyncMock()
+    worker_with_callback = DownloadWorker(broadcast_callback=broadcast_callback)
+    
+    mock_download = MagicMock()
+    mock_download.torrent_hash = "abc123"
+    mock_download.id = 1
+    mock_download.status = MagicMock()
+    mock_download.status.__ne__ = MagicMock(return_value=False)
+    mock_download.to_dict = MagicMock(return_value={"id": 1, "status": "downloading"})
+    
+    with patch("app.services.download_worker.SessionLocal") as mock_session:
+        mock_session.return_value = mock_db
+        mock_db.query.return_value.filter.return_value.all.return_value = [mock_download]
+        
+        with patch("app.services.download_worker.QBittorrentService", return_value=mock_qbit_service):
+            await worker_with_callback._sync_progress()
+    
+    mock_download.to_dict.assert_called_once()
+    broadcast_callback.assert_called_once()
+    call_args = broadcast_callback.call_args[0][0]
+    assert call_args["type"] == "download_update"
+    assert call_args["data"] == {"id": 1, "status": "downloading"}
+
+
+@pytest.mark.asyncio
+async def test_organize_completed_download_uses_transition_to(mock_qbit_service):
+    """Test that organize_completed_download uses download.transition_to()."""
+    worker = DownloadWorker()
+
+    mock_download = MagicMock()
+    mock_download.id = 1
+    mock_download.type.value = "movie"
+    mock_download.title = "Test Movie"
+    mock_download.source_folder = "/downloads/test-movie"
+    mock_download.quality = "1080p"
+    mock_download.torrent_hash = "abc123"
+    mock_download.transition_to = MagicMock()
+
+    mock_db = MagicMock()
+
+    with patch("app.services.download_worker.OrganizerService") as mock_organizer_cls:
+        mock_organizer = MagicMock()
+        mock_organizer.organize_movie = AsyncMock(return_value="/movies/Test Movie")
+        mock_organizer_cls.return_value = mock_organizer
+
+        with patch("app.services.download_worker.QBittorrentService", return_value=mock_qbit_service):
+            await worker._organize_completed_download(mock_download, mock_db)
+
+    mock_download.transition_to.assert_called_once()
+    from app.models.download import DownloadStatus
+    assert mock_download.transition_to.call_args[0][0] == DownloadStatus.ORGANIZED
+
 
 @pytest.mark.asyncio
 async def test_organize_completed_download_anime(mock_qbit_service):
