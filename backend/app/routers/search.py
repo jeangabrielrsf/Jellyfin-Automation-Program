@@ -1,7 +1,7 @@
 """Search router."""
 import re
 from fastapi import APIRouter, HTTPException, Query, Depends
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.tmdb_service import TMDBService
@@ -64,6 +64,46 @@ async def search_media(
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
     finally:
         await service.close()
+
+@router.get("/discover/", response_model=TMDBSearchResponse)
+async def discover_media(
+    media_type: str = Query("all", pattern="^(movie|series|anime|all)$"),
+    genre_ids: Optional[List[int]] = Query(None),
+    watch_provider_ids: Optional[List[int]] = Query(None),
+    year_from: Optional[int] = Query(None),
+    year_to: Optional[int] = Query(None),
+    min_rating: Optional[float] = Query(None, ge=0, le=10),
+    sort_by: str = Query(
+        "popularity.desc",
+        pattern=r"^(popularity\.desc|vote_average\.desc|vote_count\.desc|release_date\.desc|original_title\.asc)$",
+    ),
+    page: int = Query(1, ge=1),
+    db: Session = Depends(get_db),
+):
+    """Discover movies/TV with filters (separate from text search)."""
+    if year_from is not None and year_to is not None and year_from > year_to:
+        raise HTTPException(status_code=422, detail="year_from must be <= year_to")
+
+    service = TMDBService(db=db)
+    try:
+        results = await service.discover(
+            media_type=media_type,
+            genre_ids=genre_ids,
+            watch_provider_ids=watch_provider_ids,
+            year_from=year_from,
+            year_to=year_to,
+            min_rating=min_rating,
+            sort_by=sort_by,
+            page=page,
+        )
+        return results
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Discover failed: {str(e)}")
+    finally:
+        await service.close()
+
 
 @router.get("/movie/{movie_id}", response_model=TMDBDetail)
 async def get_movie_detail(

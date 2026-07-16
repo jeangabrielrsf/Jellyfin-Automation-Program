@@ -7,12 +7,16 @@ class TMDBSearchResult(BaseModel):
     id: int
     title: Optional[str] = None
     name: Optional[str] = None
+    original_title: Optional[str] = None
+    original_name: Optional[str] = None
     overview: str
     poster_path: Optional[str] = None
     backdrop_path: Optional[str] = None
     release_date: Optional[str] = None
     first_air_date: Optional[str] = None
     vote_average: float
+    vote_count: Optional[int] = None
+    popularity: Optional[float] = None
     media_type: str
     genre_ids: List[int] = []
     
