@@ -1,16 +1,34 @@
 """Discover Pydantic models."""
 from typing import Optional, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 
 from app.models.tmdb import TMDBSearchResult
 
 
 class DiscoverParams(BaseModel):
     genre_id: Optional[int] = None
-    media_type: Optional[str] = None  # "movie" | "series" | "anime"
+    media_type: Optional[str] = None
     sort_by: str = "popularity.desc"
     watch_provider_id: Optional[int] = None
+
+
+class BannerMedia(BaseModel):
+    id: int
+    title: Optional[str] = None
+    name: Optional[str] = None
+    overview: str
+    poster_path: Optional[str] = None
+    backdrop_path: Optional[str] = None
+    release_date: Optional[str] = None
+    first_air_date: Optional[str] = None
+    vote_average: float
+    media_type: str
+    genres: List[str] = []
+    providers: List[str] = []
+    runtime: Optional[int] = None
+    display_title: Optional[str] = None
+    year: Optional[int] = None
 
 
 class SectionInfo(BaseModel):
@@ -20,7 +38,7 @@ class SectionInfo(BaseModel):
 
 
 class SectionCatalog(BaseModel):
-    banner: Optional[TMDBSearchResult] = None
+    banner: Optional[BannerMedia] = None
     sections: List[SectionInfo]
 
 

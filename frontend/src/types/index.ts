@@ -102,13 +102,6 @@ export interface AppSettings {
   log_level: string;
 }
 
-export interface DiscoverParams {
-  genre_id?: number | null
-  media_type?: string | null
-  sort_by?: string
-  watch_provider_id?: number | null
-}
-
 export interface SectionInfo {
   id: string
   title: string
@@ -253,6 +246,24 @@ export interface LogsResponse {
 }
 
 export interface SectionCatalog {
-  banner?: TMDBSearchResult;
+  banner?: BannerMedia;
   sections: SectionInfo[];
+}
+
+export interface BannerMedia {
+  id: number;
+  title?: string;
+  name?: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  release_date?: string;
+  first_air_date?: string;
+  vote_average: number;
+  media_type: string;
+  genres: string[];
+  providers: string[];
+  runtime?: number;
+  display_title?: string;
+  year?: number;
 }

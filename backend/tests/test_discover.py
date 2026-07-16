@@ -50,6 +50,14 @@ class _MockClient:
             return _MockResponse({"genres": [{"id": 28, "name": "Ação"}, {"id": 35, "name": "Comédia"}]})
         elif "genre/tv/list" in url_str:
             return _MockResponse({"genres": [{"id": 28, "name": "Ação"}, {"id": 18, "name": "Drama"}]})
+        elif "watch/providers" in url_str:
+            return _MockResponse({"results": {"BR": {"flatrate": [{"provider_name": "Netflix"}]}}})
+        elif "/movie/" in url_str or "/tv/" in url_str:
+            return _MockResponse({
+                "id": 1,
+                "genres": [{"id": 28, "name": "Ação"}],
+                "runtime": 120,
+            })
         elif "trending/all/week" in url_str:
             return _MockResponse({
                 "results": [

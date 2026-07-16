@@ -1,10 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Star } from 'lucide-react';
-import { TMDBSearchResult } from '../types';
+import { Star, Clock, Tv } from 'lucide-react';
+import { BannerMedia } from '../types';
 
 interface DiscoverBannerProps {
-  media: TMDBSearchResult | null;
+  media: BannerMedia | null;
 }
 
 export const DiscoverBanner: React.FC<DiscoverBannerProps> = ({ media }) => {
@@ -52,20 +52,47 @@ export const DiscoverBanner: React.FC<DiscoverBannerProps> = ({ media }) => {
                   <span className="font-medium">{media.vote_average.toFixed(1)}</span>
                 </div>
               )}
+              {media.runtime != null && media.runtime > 0 && (
+                <div className="flex items-center gap-1">
+                  <Clock className="w-4 h-4" />
+                  <span>{media.runtime} min</span>
+                </div>
+              )}
             </div>
-            
+
+            {media.genres.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {media.genres.map((genre) => (
+                  <span
+                    key={genre}
+                    className="px-2 py-0.5 text-xs font-medium bg-white/20 text-white rounded-full backdrop-blur-sm"
+                  >
+                    {genre}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {media.overview && (
               <p className="text-white/80 text-sm md:text-base line-clamp-3">
                 {media.overview}
               </p>
             )}
-            
-            <button
-              onClick={handleClick}
-              className="px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-colors"
-            >
-              Ver detalhes
-            </button>
+
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleClick}
+                className="px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-colors"
+              >
+                Ver detalhes
+              </button>
+              {media.providers.length > 0 && (
+                <div className="flex items-center gap-2 text-white/70 text-sm">
+                  <Tv className="w-4 h-4" />
+                  <span>{media.providers.join(', ')}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

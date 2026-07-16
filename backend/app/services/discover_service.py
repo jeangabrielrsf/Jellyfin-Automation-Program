@@ -1,4 +1,5 @@
 """Discover service — TMDB section data with in-memory TTL cache."""
+import asyncio
 import time
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Tuple
@@ -12,6 +13,7 @@ from app.models.discover import (
     SectionCatalog,
     DiscoverSection,
     Genre,
+    BannerMedia,
 )
 from app.models.tmdb import TMDBSearchResult
 from app.logging_config import get_logger
@@ -87,7 +89,40 @@ class DiscoverService:
             if not mt:
                 mt = "movie" if "title" in item else "tv"
 
-            banner = TMDBSearchResult(
+            tmdb_type = "movie" if mt == "movie" else "tv"
+            detail_url = f"{self.BASE_URL}/{tmdb_type}/{item['id']}"
+            providers_url = f"{self.BASE_URL}/{tmdb_type}/{item['id']}/watch/providers"
+
+            detail_resp, providers_resp = await asyncio.gather(
+                self.client.get(detail_url, params={"api_key": self.api_key, "language": "pt-BR"}),
+                self.client.get(providers_url, params={"api_key": self.api_key}),
+                return_exceptions=True,
+            )
+
+            genres: List[str] = []
+            runtime: Optional[int] = None
+            if not isinstance(detail_resp, Exception):
+                detail_resp.raise_for_status()
+                detail = detail_resp.json()
+                genres = [g["name"] for g in detail.get("genres", [])]
+                runtime = detail.get("runtime")
+                if mt == "tv":
+                    eps = detail.get("episode_run_time", [])
+                    if eps and isinstance(eps, list):
+                        runtime = eps[0]
+
+            providers: List[str] = []
+            if not isinstance(providers_resp, Exception):
+                providers_resp.raise_for_status()
+                pdata = providers_resp.json()
+                br = pdata.get("results", {}).get("BR", {})
+                providers = [p["provider_name"] for p in br.get("flatrate", [])]
+
+            title = item.get("title") or item.get("name")
+            date = item.get("release_date") or item.get("first_air_date")
+            year = int(date[:4]) if date and len(date) >= 4 and date[:4].isdigit() else None
+
+            banner = BannerMedia(
                 id=item["id"],
                 title=item.get("title"),
                 name=item.get("name"),
@@ -98,7 +133,11 @@ class DiscoverService:
                 first_air_date=item.get("first_air_date"),
                 vote_average=item.get("vote_average", 0.0),
                 media_type=mt,
-                genre_ids=item.get("genre_ids", []),
+                genres=genres,
+                providers=providers,
+                runtime=runtime,
+                display_title=title,
+                year=year,
             )
             self._banner_cache = (time.time(), banner)
             return banner
@@ -107,7 +146,7 @@ class DiscoverService:
             self._banner_cache = (time.time(), None)
             return None
 
-    async def _ensure_banner(self) -> Optional[TMDBSearchResult]:
+    async def _ensure_banner(self) -> Optional[BannerMedia]:
         return await self._fetch_banner()
 
     async def get_sections_catalog(self) -> SectionCatalog:

@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { DiscoverBanner } from './DiscoverBanner';
-import type { TMDBSearchResult } from '@/types';
+import type { BannerMedia } from '@/types';
 import { BrowserRouter } from 'react-router-dom';
 
-const mockMedia: TMDBSearchResult = {
+const mockMedia: BannerMedia = {
   id: 123,
   title: 'Test Movie',
   overview: 'This is a test movie overview with some details.',
@@ -13,7 +13,9 @@ const mockMedia: TMDBSearchResult = {
   release_date: '2024-01-15',
   vote_average: 8.5,
   media_type: 'movie',
-  genre_ids: [28, 12],
+  genres: ['Action', 'Adventure'],
+  providers: ['Netflix'],
+  runtime: 120,
   display_title: 'Test Movie',
   year: 2024,
 };
@@ -68,7 +70,7 @@ describe('DiscoverBanner', () => {
   });
 
   it('uses name for TV shows', () => {
-    const tvMedia: TMDBSearchResult = {
+    const tvMedia: BannerMedia = {
       ...mockMedia,
       title: undefined,
       name: 'Test Series',
