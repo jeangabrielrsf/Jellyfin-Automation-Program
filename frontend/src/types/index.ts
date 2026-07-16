@@ -251,5 +251,6 @@ export interface LogsResponse {
 }
 
 export interface SectionCatalog {
+  banner?: TMDBSearchResult;
   sections: SectionInfo[];
 }

@@ -1,5 +1,25 @@
 # CONTEXT.md — Glossário do Domínio
 
+## Descoberta Passiva
+
+Modo de navegação onde o sistema apresenta conteúdo curado sem exigir que o usuário faça buscas ativas. A página "Explorar" implementa este modo — mostra um banner de destaque e fileiras curadas (tendências, recém adicionados, em alta, animes da temporada, clássicos imperdíveis) que mudam com frequência. Sem filtros — a própria curadoria é o filtro.
+
+## Busca Orientada
+
+Modo de navegação onde o usuário sabe mais ou menos o que quer e usa ferramentas para refinar a busca. A página "Buscar" implementa este modo com duas abas: "Texto" (busca por nome) e "Filtros" (6 filtros: tipo, gênero, provider, ano, nota, ordenação). Os dois modos são separados porque o TMDB não permite combinar busca por texto com filtros de descoberta na mesma chamada.
+
+## Banner de Destaque
+
+Elemento visual no topo da página Explorar que mostra o conteúdo #1 em tendência, com rotação entre os top 5 (um por dia). Exibe backdrop em tela cheia, título, ano, nota, gêneros, sinopse curta, provider de streaming, duração, e botão "Ver detalhes". Mostra filmes e séries misturados, sem distinção.
+
+## Fileiras Curadas
+
+Linhas horizontais de conteúdo na página Explorar, cada uma com propósito claro e mudança frequente. As 5 fileiras (em ordem de relevância temporal): Tendências da semana, Recém adicionados (streamings), Em alta no streaming, Animes da temporada, Clássicos imperdiveis. Cada fileira tem scroll horizontal com setas (← →) e mostra ~6-8 cards no desktop, ~3-4 no mobile.
+
+## Modos de Busca
+
+As duas abas da página Buscar: "Texto" (campo de busca + resultados) e "Filtros" (6 filtros em grid 2x3 + botão "Aplicar filtros" + resultados). Quando o usuário digita texto, usa o endpoint `/search/multi` do TMDB (sem filtros). Quando usa filtros, usa `/discover/movie` ou `/discover/tv` (sem texto). Os filtros mantêm estado durante a sessão.
+
 ## Busca de Torrents
 
 Fluxo de encontrar torrents para uma mídia específica (filme, série ou anime) via Jackett. O usuário seleciona uma mídia no TMDB, escolhe temporada/episódio (se aplicável), e o sistema busca torrents nos indexers configurados.

@@ -1,16 +1,17 @@
 """Discover service — TMDB section data with in-memory TTL cache."""
 import time
-import httpx
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Tuple
+
+import httpx
 from sqlalchemy.orm import Session
+
 from app.services.config_service import get_config
 from app.models.discover import (
-    DiscoverParams,
     SectionInfo,
     SectionCatalog,
     DiscoverSection,
     Genre,
-    StreamingProvider,
 )
 from app.models.tmdb import TMDBSearchResult
 from app.logging_config import get_logger
@@ -18,30 +19,12 @@ from app.logging_config import get_logger
 logger = get_logger(__name__)
 
 SECTION_DEFS: List[SectionInfo] = [
-    SectionInfo(id="popular-movies", title="Filmes Populares", media_type="movie"),
-    SectionInfo(id="popular-series", title="Séries Populares", media_type="series"),
-    SectionInfo(id="popular-animes", title="Animes Populares", media_type="anime"),
     SectionInfo(id="trending", title="Tendências da Semana", media_type="mixed"),
-    SectionInfo(id="top-rated-movies", title="Filmes Melhor Avaliados", media_type="movie"),
-    SectionInfo(id="top-rated-series", title="Séries Melhor Avaliadas", media_type="series"),
-    SectionInfo(id="now-playing", title="Nos Cinemas", media_type="movie"),
-    SectionInfo(id="upcoming", title="Em Breve", media_type="movie"),
-    SectionInfo(id="genre-action", title="Ação", media_type="mixed"),
-    SectionInfo(id="genre-comedy", title="Comédia", media_type="mixed"),
-    SectionInfo(id="genre-drama", title="Drama", media_type="mixed"),
-    SectionInfo(id="genre-horror", title="Terror", media_type="mixed"),
-    SectionInfo(id="genre-scifi", title="Ficção Científica", media_type="mixed"),
+    SectionInfo(id="recently-added", title="Recém Adicionados", media_type="mixed"),
+    SectionInfo(id="streaming-hot", title="Em Alta no Streaming", media_type="mixed"),
+    SectionInfo(id="seasonal-anime", title="Animes da Temporada", media_type="anime"),
+    SectionInfo(id="classics", title="Clássicos Imperdíveis", media_type="movie"),
 ]
-
-GENRE_SECTION_IDS = {
-    "genre-action": 28,
-    "genre-comedy": 35,
-    "genre-drama": 18,
-    "genre-horror": 27,
-    "genre-scifi": 878,
-}
-
-ANIME_GENRE_ID = 16
 
 STREAMING_PROVIDERS = [
     {"id": 8, "name": "Netflix", "logo_path": None},
@@ -53,11 +36,14 @@ STREAMING_PROVIDERS = [
     {"id": 531, "name": "Paramount+", "logo_path": None},
 ]
 
+STREAMING_PROVIDER_IDS = "|".join(str(p["id"]) for p in STREAMING_PROVIDERS)
+
 
 class DiscoverService:
     BASE_URL = "https://api.themoviedb.org/3"
-    SECTION_TTL = 300   # 5 minutes
-    GENRE_TTL = 3600    # 1 hour
+    SECTION_TTL = 300
+    GENRE_TTL = 3600
+    BANNER_TTL = 300
 
     def __init__(self, db: Session | None = None):
         self.db = db
@@ -65,53 +51,84 @@ class DiscoverService:
         self.client = httpx.AsyncClient(timeout=10.0)
         self._section_cache: Dict[str, Tuple[float, DiscoverSection]] = {}
         self._genre_cache: Optional[Tuple[float, List[Genre]]] = None
+        self._banner_cache: Optional[Tuple[float, Optional[TMDBSearchResult]]] = None
 
     async def close(self):
-        """Close the HTTP client."""
         await self.client.aclose()
 
-    STREAMING_INCOMPATIBLE_SECTIONS = {"now-playing", "upcoming", "trending"}
+    @staticmethod
+    def _pick_banner_index(now: datetime) -> int:
+        return (now.timetuple().tm_yday - 1) % 5
 
-    def _filters_active(self, params: DiscoverParams) -> bool:
-        return params.genre_id is not None or params.media_type is not None or params.watch_provider_id is not None
+    async def _fetch_banner(self) -> Optional[TMDBSearchResult]:
+        if self._banner_cache:
+            ts, data = self._banner_cache
+            if time.time() - ts < self.BANNER_TTL:
+                return data
 
-    def _cache_key(self, section_id: str, params: DiscoverParams) -> str:
-        return f"{section_id}:{params.genre_id}:{params.media_type}:{params.sort_by}:{params.watch_provider_id}"
+        try:
+            common = {"api_key": self.api_key, "language": "pt-BR", "include_adult": "false"}
+            response = await self.client.get(
+                f"{self.BASE_URL}/trending/all/week", params=common
+            )
+            response.raise_for_status()
+            data = response.json()
+            raw = data.get("results", [])[:5]
 
-    def get_sections_catalog(self, params: DiscoverParams) -> SectionCatalog:
+            if not raw:
+                self._banner_cache = (time.time(), None)
+                return None
+
+            index = self._pick_banner_index(datetime.now())
+            index = min(index, len(raw) - 1)
+            item = raw[index]
+
+            mt = item.get("media_type", "")
+            if not mt:
+                mt = "movie" if "title" in item else "tv"
+
+            banner = TMDBSearchResult(
+                id=item["id"],
+                title=item.get("title"),
+                name=item.get("name"),
+                overview=item.get("overview", ""),
+                poster_path=item.get("poster_path"),
+                backdrop_path=item.get("backdrop_path"),
+                release_date=item.get("release_date"),
+                first_air_date=item.get("first_air_date"),
+                vote_average=item.get("vote_average", 0.0),
+                media_type=mt,
+                genre_ids=item.get("genre_ids", []),
+            )
+            self._banner_cache = (time.time(), banner)
+            return banner
+        except Exception:
+            logger.exception("Failed to fetch banner")
+            self._banner_cache = (time.time(), None)
+            return None
+
+    async def _ensure_banner(self) -> Optional[TMDBSearchResult]:
+        return await self._fetch_banner()
+
+    async def get_sections_catalog(self) -> SectionCatalog:
+        banner = await self._ensure_banner()
         sections = list(SECTION_DEFS)
-        if params.watch_provider_id:
-            sections = [s for s in sections if s.id not in self.STREAMING_INCOMPATIBLE_SECTIONS]
-        elif self._filters_active(params):
-            sections = [s for s in sections if s.id != "trending"]
-        return SectionCatalog(sections=sections)
+        return SectionCatalog(banner=banner, sections=sections)
 
-    async def get_section(self, section_id: str, params: DiscoverParams) -> DiscoverSection:
-        # Return cached if still valid
-        key = self._cache_key(section_id, params)
+    async def get_section(self, section_id: str) -> DiscoverSection:
+        key = section_id
         cached = self._section_cache.get(key)
         if cached:
             ts, data = cached
             if time.time() - ts < self.SECTION_TTL:
                 return data
 
-        # Find section definition
         section_def = next((s for s in SECTION_DEFS if s.id == section_id), None)
         if not section_def:
             return DiscoverSection(id=section_id, title="", media_type="", results=[], total_results=0)
 
-        # Trending + filters = empty
-        if section_id == "trending" and self._filters_active(params):
-            return DiscoverSection(
-                id=section_id,
-                title=section_def.title,
-                media_type=section_def.media_type,
-                results=[],
-                total_results=0,
-            )
-
         try:
-            results = await self._fetch_tmdb(self.client, section_id, section_def, params)
+            results = await self._fetch_tmdb(section_id, section_def)
         except Exception:
             logger.exception("Failed to fetch section data", section_id=section_id)
             results = []
@@ -126,67 +143,53 @@ class DiscoverService:
         self._section_cache[key] = (time.time(), section)
         return section
 
-    async def _fetch_tmdb(self, client, section_id: str, section_def: SectionInfo, params: DiscoverParams) -> List[TMDBSearchResult]:
+    async def _fetch_tmdb(self, section_id: str, section_def: SectionInfo) -> List[TMDBSearchResult]:
         common = {"api_key": self.api_key, "language": "pt-BR", "include_adult": "false"}
 
-        use_discover = self._filters_active(params) or section_id.startswith("genre-") or section_def.media_type == "anime"
+        url: str
+        query: dict
 
-        if use_discover:
-            if section_def.media_type == "movie":
-                media = "movie"
-            elif section_def.media_type in ("series", "anime"):
-                media = "tv"
-            else:
-                media = "tv" if params.media_type == "series" else "movie"
-
-            url = f"{self.BASE_URL}/discover/{media}"
-            query: dict = {**common, "sort_by": params.sort_by}
-
-            # Streaming provider
-            if params.watch_provider_id:
-                query["with_watch_providers"] = str(params.watch_provider_id)
-                query["watch_region"] = "BR"
-
-            # Genre
-            if section_id.startswith("genre-"):
-                genre_id = GENRE_SECTION_IDS.get(section_id)
-                if genre_id:
-                    query["with_genres"] = str(genre_id)
-            elif params.genre_id:
-                query["with_genres"] = str(params.genre_id)
-
-            # Anime
-            if section_def.media_type == "anime":
-                query["with_genres"] = str(ANIME_GENRE_ID)
-                query["with_origin_country"] = "JP"
-                if params.genre_id and params.genre_id != ANIME_GENRE_ID:
-                    query["with_genres"] = f"{ANIME_GENRE_ID},{params.genre_id}"
-
+        if section_id == "trending":
+            url = f"{self.BASE_URL}/trending/all/week"
+            query = {**common}
+        elif section_id == "recently-added":
+            url = f"{self.BASE_URL}/discover/movie"
+            date_30_days_ago = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+            query = {
+                **common,
+                "sort_by": "primary_release_date.desc",
+                "with_watch_providers": STREAMING_PROVIDER_IDS,
+                "watch_region": "BR",
+                "primary_release_date.gte": date_30_days_ago,
+            }
+        elif section_id == "streaming-hot":
+            url = f"{self.BASE_URL}/discover/movie"
+            query = {
+                **common,
+                "sort_by": "popularity.desc",
+                "with_watch_providers": STREAMING_PROVIDER_IDS,
+                "watch_region": "BR",
+            }
+        elif section_id == "seasonal-anime":
+            url = f"{self.BASE_URL}/discover/tv"
+            query = {
+                **common,
+                "sort_by": "popularity.desc",
+                "with_genres": "16",
+                "with_origin_country": "JP",
+            }
+        elif section_id == "classics":
+            url = f"{self.BASE_URL}/discover/movie"
+            query = {
+                **common,
+                "sort_by": "vote_average.desc",
+                "vote_count.gte": "1000",
+            }
         else:
-            # Native endpoints (no filters)
-            path: str
-            param_extra: dict = {}
-            if section_id == "popular-movies":
-                path = "/movie/popular"
-            elif section_id == "popular-series":
-                path = "/tv/popular"
-            elif section_id == "trending":
-                path = "/trending/all/week"
-            elif section_id == "top-rated-movies":
-                path = "/movie/top_rated"
-            elif section_id == "top-rated-series":
-                path = "/tv/top_rated"
-            elif section_id == "now-playing":
-                path = "/movie/now_playing"
-            elif section_id == "upcoming":
-                path = "/movie/upcoming"
-            else:
-                path = "/movie/popular"
+            url = f"{self.BASE_URL}/movie/popular"
+            query = {**common}
 
-            url = f"{self.BASE_URL}{path}"
-            query = {**common, **param_extra}
-
-        response = await client.get(url, params=query)
+        response = await self.client.get(url, params=query)
         response.raise_for_status()
         data = response.json()
 
@@ -212,7 +215,6 @@ class DiscoverService:
         return results
 
     async def get_genres(self) -> List[Genre]:
-        # Check cache
         if self._genre_cache:
             ts, data = self._genre_cache
             if time.time() - ts < self.GENRE_TTL:

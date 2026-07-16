@@ -20,6 +20,7 @@ class SectionInfo(BaseModel):
 
 
 class SectionCatalog(BaseModel):
+    banner: Optional[TMDBSearchResult] = None
     sections: List[SectionInfo]
 
 
