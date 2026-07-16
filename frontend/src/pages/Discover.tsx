@@ -3,9 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { discoverAPI } from '../services/api';
 import { DiscoverBanner } from '../components/DiscoverBanner';
 import { DiscoverRow } from '../components/DiscoverRow';
-import { SectionInfo, DiscoverParams } from '../types';
-
-const emptyFilters: DiscoverParams = {};
+import { SectionInfo } from '../types';
 
 const BannerSkeleton: React.FC = () => (
   <div className="w-full h-[500px] md:h-[600px] rounded-xl bg-muted animate-shimmer mb-8" />
@@ -42,7 +40,7 @@ const DiscoverPage: React.FC = () => {
       )}
 
       {catalog && catalog.sections.map((section: SectionInfo) => (
-        <DiscoverRow key={section.id} section={section} filters={emptyFilters} />
+        <DiscoverRow key={section.id} section={section} />
       ))}
     </div>
   );

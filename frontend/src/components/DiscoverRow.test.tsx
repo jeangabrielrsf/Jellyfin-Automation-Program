@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AxiosResponse } from 'axios';
 import { DiscoverRow } from './DiscoverRow';
-import type { SectionInfo, DiscoverParams, TMDBSearchResult, DiscoverSection } from '@/types';
+import type { SectionInfo, TMDBSearchResult, DiscoverSection } from '@/types';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as api from '@/services/api';
@@ -46,8 +46,6 @@ const mockSection: SectionInfo = {
   media_type: 'mixed',
 };
 
-const mockFilters: DiscoverParams = {};
-
 const createQueryClient = () => new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });
@@ -71,7 +69,7 @@ describe('DiscoverRow', () => {
       mockResponse({ id: 'trending', title: 'Tendências da Semana', media_type: 'mixed', results: [], total_results: 0 })
     );
 
-    renderWithProviders(<DiscoverRow section={mockSection} filters={mockFilters} />);
+    renderWithProviders(<DiscoverRow section={mockSection} />);
     expect(screen.getByText('Tendências da Semana')).toBeInTheDocument();
     const shimmerElements = document.querySelectorAll('.animate-shimmer');
     expect(shimmerElements.length).toBeGreaterThan(0);
@@ -82,7 +80,7 @@ describe('DiscoverRow', () => {
       mockResponse({ id: 'trending', title: 'Tendências da Semana', media_type: 'mixed', results: mockResults, total_results: 2 })
     );
 
-    renderWithProviders(<DiscoverRow section={mockSection} filters={mockFilters} />);
+    renderWithProviders(<DiscoverRow section={mockSection} />);
     expect(await screen.findByText('Tendências da Semana')).toBeInTheDocument();
   });
 
@@ -91,7 +89,7 @@ describe('DiscoverRow', () => {
       mockResponse({ id: 'trending', title: 'Tendências da Semana', media_type: 'mixed', results: mockResults, total_results: 2 })
     );
 
-    renderWithProviders(<DiscoverRow section={mockSection} filters={mockFilters} />);
+    renderWithProviders(<DiscoverRow section={mockSection} />);
     
     const leftArrow = await screen.findByLabelText('scroll left');
     const rightArrow = await screen.findByLabelText('scroll right');
@@ -102,7 +100,7 @@ describe('DiscoverRow', () => {
   it('renders nothing on error', async () => {
     vi.mocked(api.discoverAPI.getSection).mockRejectedValue(new Error('API Error'));
 
-    const { container } = renderWithProviders(<DiscoverRow section={mockSection} filters={mockFilters} />);
+    const { container } = renderWithProviders(<DiscoverRow section={mockSection} />);
     await vi.waitFor(() => {
       expect(container.firstChild).toBeNull();
     });
@@ -113,7 +111,7 @@ describe('DiscoverRow', () => {
       mockResponse({ id: 'trending', title: 'Tendências da Semana', media_type: 'mixed', results: [], total_results: 0 })
     );
 
-    const { container } = renderWithProviders(<DiscoverRow section={mockSection} filters={mockFilters} />);
+    const { container } = renderWithProviders(<DiscoverRow section={mockSection} />);
     await vi.waitFor(() => {
       expect(container.firstChild).toBeNull();
     });

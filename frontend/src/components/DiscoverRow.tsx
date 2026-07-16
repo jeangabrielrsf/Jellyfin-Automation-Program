@@ -4,11 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { discoverAPI } from '../services/api';
 import { MediaCard } from './MediaCard';
-import { SectionInfo, DiscoverParams, TMDBSearchResult } from '../types';
+import { SectionInfo, TMDBSearchResult } from '../types';
 
 interface DiscoverRowProps {
   section: SectionInfo;
-  filters: DiscoverParams;
 }
 
 const SCROLL_STEP = 600;
@@ -34,14 +33,14 @@ const ScrollArrow: React.FC<ScrollArrowProps> = ({ direction, onClick }) => {
   );
 };
 
-export const DiscoverRow: React.FC<DiscoverRowProps> = ({ section, filters }) => {
+export const DiscoverRow: React.FC<DiscoverRowProps> = ({ section }) => {
   const navigate = useNavigate();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['discover', 'section', section.id, filters],
+    queryKey: ['discover', 'section', section.id],
     queryFn: async () => {
-      const res = await discoverAPI.getSection(section.id, filters);
+      const res = await discoverAPI.getSection(section.id);
       return res.data;
     },
   });

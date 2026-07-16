@@ -130,19 +130,9 @@ export const logsAPI = {
 };
 
 export const discoverAPI = {
-  getSections: (params?: {
-    genre_id?: number | null;
-    media_type?: string | null;
-    sort_by?: string;
-    watch_provider_id?: number | null;
-  }) => api.get<SectionCatalog>('/discover/sections/', { params }),
+  getSections: () => api.get<SectionCatalog>('/discover/sections/'),
 
-  getSection: (id: string, params?: {
-    genre_id?: number | null;
-    media_type?: string | null;
-    sort_by?: string;
-    watch_provider_id?: number | null;
-  }) => api.get<DiscoverSection>(`/discover/sections/${id}/`, { params }),
+  getSection: (id: string) => api.get<DiscoverSection>(`/discover/sections/${id}/`),
 
   getGenres: () => api.get<Genre[]>('/discover/genres/'),
 
