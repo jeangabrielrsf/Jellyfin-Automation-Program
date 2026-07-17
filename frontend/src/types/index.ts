@@ -14,6 +14,13 @@ export interface TMDBSearchResult {
   year?: number;
 }
 
+export interface WatchProvider {
+  provider_id: number;
+  provider_name: string;
+  logo_path?: string;
+  type: string;
+}
+
 export interface TMDBDetail {
   id: number;
   title?: string;
@@ -44,6 +51,7 @@ export interface TMDBDetail {
       name: string;
     }>;
   };
+  watch_providers?: WatchProvider[];
 }
 
 export interface TorrentResult {
@@ -210,8 +218,7 @@ export interface MessageResponse {
 }
 
 export interface ClearDownloadsResponse {
-  deleted: number;
-  skipped: number;
+  cleared: number;
   files_deleted: boolean;
 }
 

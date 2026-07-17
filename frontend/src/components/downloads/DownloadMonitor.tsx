@@ -12,7 +12,7 @@ interface DownloadMonitorProps {
     onPause: (id: number) => void;
     onResume: (id: number) => void;
     onCancel: (id: number, deleteFiles: boolean) => void;
-    onClear: (deleteFiles: boolean) => void;
+    onClear: (downloads: { id: number; delete_files: boolean }[]) => void;
 }
 
 export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
@@ -28,7 +28,7 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
         useState<DownloadType | null>(null);
 
     const clearableCount = downloads.filter(
-        (d) => d.status !== "pending" && d.status !== "downloading",
+        (d) => d.status !== "pending" && d.status !== "downloading" && d.status !== "cleared",
     ).length;
 
     if (downloads.length === 0) {

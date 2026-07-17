@@ -28,6 +28,8 @@ export const CancelConfirmationDialog: React.FC<CancelConfirmationDialogProps> =
   const isControlled = controlledIsOpen !== undefined;
   const isOpen = isControlled ? controlledIsOpen : internalIsOpen;
 
+  const isActive = download.status === 'pending' || download.status === 'downloading';
+
   useEffect(() => {
     if (!isOpen) {
       setDeleteFiles(false);
@@ -61,16 +63,25 @@ export const CancelConfirmationDialog: React.FC<CancelConfirmationDialogProps> =
     }
   };
 
+  const title = isActive ? 'Cancelar download' : 'Limpar da lista';
+  const message = isActive
+    ? `Tem certeza que deseja cancelar o download de ${download.title}?`
+    : `Tem certeza que deseja limpar ${download.title} da lista?`;
+  const checkboxLabel = isActive
+    ? 'Deletar arquivos parciais do disco'
+    : 'Deletar arquivos baixados do disco';
+  const buttonLabel = isActive ? 'Cancelar download' : 'Limpar da lista';
+
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="glass rounded-2xl p-6 max-w-md w-full space-y-4 border-none">
         <DialogHeader>
           <DialogTitle className="font-display text-xl font-bold text-foreground">
-            Cancelar download
+            {title}
           </DialogTitle>
         </DialogHeader>
         <p className="text-muted-foreground text-sm">
-          Tem certeza que deseja cancelar o download de <strong className="text-foreground">{download.title}</strong>?
+          {message}
         </p>
         <label className="flex items-center gap-2 cursor-pointer select-none p-3 rounded-lg bg-muted/50 border border-border/30">
           <input
@@ -79,14 +90,14 @@ export const CancelConfirmationDialog: React.FC<CancelConfirmationDialogProps> =
             onChange={(e) => setDeleteFiles(e.target.checked)}
             className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
           />
-          <span className="text-sm text-foreground">Deletar arquivos baixados do disco</span>
+          <span className="text-sm text-foreground">{checkboxLabel}</span>
         </label>
         <DialogFooter>
           <Button variant="outline" onClick={handleBack}>
             Voltar
           </Button>
           <Button variant="destructive" onClick={handleCancel}>
-            Cancelar download
+            {buttonLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -19,6 +19,7 @@ class DownloadStatus(str, enum.Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
     ORGANIZED = "organized"
+    CLEARED = "cleared"
 
 class Download(Base):
     __tablename__ = "downloads"
@@ -39,16 +40,23 @@ class Download(Base):
         DownloadStatus.COMPLETED: {
             DownloadStatus.ORGANIZED,
             DownloadStatus.FAILED,
+            DownloadStatus.CLEARED,
             DownloadStatus.COMPLETED,
         },
         DownloadStatus.FAILED: {
             DownloadStatus.FAILED,
+            DownloadStatus.CLEARED,
         },
         DownloadStatus.CANCELLED: {
             DownloadStatus.CANCELLED,
+            DownloadStatus.CLEARED,
         },
         DownloadStatus.ORGANIZED: {
             DownloadStatus.ORGANIZED,
+            DownloadStatus.CLEARED,
+        },
+        DownloadStatus.CLEARED: {
+            DownloadStatus.CLEARED,
         },
     }
     

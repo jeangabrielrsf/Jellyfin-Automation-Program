@@ -29,19 +29,19 @@ const DownloadsPage: React.FC = () => {
   });
 
   const clearMutation = useMutation({
-    mutationFn: (deleteFiles: boolean) => downloadAPI.clearDownloads(deleteFiles),
+    mutationFn: (downloads: { id: number; delete_files: boolean }[]) => downloadAPI.clearDownloads(downloads),
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['downloads'] });
-      const result = response.data as { deleted: number; skipped: number; files_deleted: boolean };
+      const result = response.data as { cleared: number; files_deleted: boolean };
       const filesMsg = result.files_deleted ? ' (arquivos deletados)' : '';
-      toast.success(`${result.deleted} download(s) removido(s)${filesMsg}`);
+      toast.success(`${result.cleared} download(s) removido(s)${filesMsg}`);
     },
     onError: () => {
       toast.error('Erro ao limpar downloads');
     },
   });
 
-  const handleClear = (deleteFiles: boolean) => clearMutation.mutate(deleteFiles);
+  const handleClear = (downloads: { id: number; delete_files: boolean }[]) => clearMutation.mutate(downloads);
 
   const handlePause = (id: number) => pauseMutation.mutate(id);
   const handleResume = (id: number) => resumeMutation.mutate(id);

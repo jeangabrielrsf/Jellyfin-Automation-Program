@@ -32,15 +32,26 @@ class DownloadCreate(BaseModel):
     year: Optional[int] = None
 
 
+class ClearDownloadItem(BaseModel):
+    id: int
+    delete_files: bool = False
+
+
+class ClearDownloadsRequest(BaseModel):
+    downloads: list[ClearDownloadItem]
+
+
 @router.get("/")
 def list_downloads(
     status: Optional[DownloadStatus] = None,
     db: Session = Depends(get_db)
 ):
-    """List all downloads with optional status filter."""
+    """List all downloads with optional status filter. Excludes CLEARED by default."""
     query = db.query(Download)
     if status:
         query = query.filter(Download.status == status)
+    else:
+        query = query.filter(Download.status != DownloadStatus.CLEARED)
     return query.order_by(Download.created_at.desc()).all()
 
 @router.post("/")
@@ -172,6 +183,19 @@ async def create_download(
     finally:
         await service.close()
 
+@router.get("/clearable")
+def list_clearable_downloads(db: Session = Depends(get_db)):
+    """List all downloads that can be cleared (completed, failed, cancelled, organized)."""
+    clearable_statuses = [
+        DownloadStatus.COMPLETED,
+        DownloadStatus.FAILED,
+        DownloadStatus.CANCELLED,
+        DownloadStatus.ORGANIZED,
+    ]
+    return db.query(Download).filter(
+        Download.status.in_(clearable_statuses)
+    ).order_by(Download.created_at.desc()).all()
+
 @router.get("/{download_id}")
 def get_download(download_id: int, db: Session = Depends(get_db)):
     """Get download by ID."""
@@ -186,13 +210,14 @@ async def cancel_download(
     delete_files: bool = Query(False, description="Whether to delete downloaded files from disk"),
     db: Session = Depends(get_db)
 ):
-    """Cancel a download and optionally delete files from disk."""
+    """Cancel a download or clear a finished download from the list. Optionally delete files from disk."""
     download = db.query(Download).filter(Download.id == download_id).first()
     if not download:
         raise HTTPException(status_code=404, detail="Download not found")
     
-    # Remove torrent from qBittorrent if it has a hash
-    if download.torrent_hash:
+    is_active = download.status in {DownloadStatus.PENDING, DownloadStatus.DOWNLOADING}
+    
+    if is_active and download.torrent_hash:
         service = QBittorrentService(db=db)
         try:
             await service.delete_torrent(download.torrent_hash, delete_files=False)
@@ -201,7 +226,6 @@ async def cancel_download(
         finally:
             await service.close()
     
-    # Delete files from disk if requested
     if delete_files:
         folders_to_check = [download.source_folder, download.destination_folder]
         for folder in folders_to_check:
@@ -215,9 +239,14 @@ async def cancel_download(
                     logger.warning("Failed to delete folder", path=folder, error=str(e))
     
     try:
-        download.transition_to(DownloadStatus.CANCELLED)
-        db.commit()
-        return {"message": "Download cancelled", "files_deleted": delete_files}
+        if is_active:
+            download.transition_to(DownloadStatus.CANCELLED)
+            db.commit()
+            return {"message": "Download cancelled", "files_deleted": delete_files}
+        else:
+            download.transition_to(DownloadStatus.CLEARED)
+            db.commit()
+            return {"message": "Download cleared", "files_deleted": delete_files}
     except Exception:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error")
@@ -262,41 +291,38 @@ async def resume_download(download_id: int, db: Session = Depends(get_db)):
     
     return {"message": "Download resumed"}
 
+@router.get("/clearable")
+def list_clearable_downloads(db: Session = Depends(get_db)):
+    """List all downloads that can be cleared (completed, failed, cancelled, organized)."""
+    clearable_statuses = [
+        DownloadStatus.COMPLETED,
+        DownloadStatus.FAILED,
+        DownloadStatus.CANCELLED,
+        DownloadStatus.ORGANIZED,
+    ]
+    return db.query(Download).filter(
+        Download.status.in_(clearable_statuses)
+    ).order_by(Download.created_at.desc()).all()
+
 @router.delete("/")
 async def delete_all_downloads(
-    delete_files: bool = Query(False, description="Whether to delete downloaded files from disk"),
+    request: ClearDownloadsRequest,
     db: Session = Depends(get_db)
 ):
-    """Delete all completed, failed, and cancelled downloads. Skips active downloads.
-    Removes torrents from qBittorrent. Optionally deletes files from disk."""
+    """Clear selected downloads from the list. Each item can optionally delete files from disk."""
     
-    # Count active downloads that will be skipped
-    active_count = db.query(Download).filter(
-        Download.status.in_([DownloadStatus.PENDING, DownloadStatus.DOWNLOADING])
-    ).count()
+    cleared_count = 0
+    files_deleted_count = 0
     
-    # Get all removable downloads
-    removable = db.query(Download).filter(
-        Download.status.not_in([DownloadStatus.PENDING, DownloadStatus.DOWNLOADING])
-    ).all()
-    
-    # Remove torrents from qBittorrent
-    service = QBittorrentService(db=db)
-    for download in removable:
-        if download.torrent_hash:
-            try:
-                await service.delete_torrent(download.torrent_hash, delete_files=False)
-            except Exception:
-                logger.warning(
-                    "Failed to remove torrent from qBittorrent",
-                    download_id=download.id,
-                    torrent_hash=download.torrent_hash,
-                )
-    await service.close()
-    
-    # Delete files from disk if requested
-    if delete_files:
-        for download in removable:
+    for item in request.downloads:
+        download = db.query(Download).filter(Download.id == item.id).first()
+        if not download:
+            continue
+        
+        if download.status in {DownloadStatus.PENDING, DownloadStatus.DOWNLOADING}:
+            continue
+        
+        if item.delete_files:
             folders_to_check = [download.source_folder, download.destination_folder]
             for folder in folders_to_check:
                 if folder:
@@ -305,15 +331,17 @@ async def delete_all_downloads(
                         if path.exists() and path.is_dir():
                             shutil.rmtree(path)
                             logger.info("Deleted download folder", path=str(path))
+                            files_deleted_count += 1
                     except Exception as e:
                         logger.warning("Failed to delete folder", path=folder, error=str(e))
-    
-    # Delete all removable records in a single query
-    deleted_count = db.query(Download).filter(
-        Download.status.not_in([DownloadStatus.PENDING, DownloadStatus.DOWNLOADING])
-    ).delete(synchronize_session=False)
+        
+        try:
+            download.transition_to(DownloadStatus.CLEARED)
+            cleared_count += 1
+        except Exception:
+            logger.warning("Failed to clear download", download_id=download.id)
     
     db.commit()
     
-    logger.info("Cleared downloads", deleted=deleted_count, skipped=active_count, files_deleted=delete_files)
-    return {"deleted": deleted_count, "skipped": active_count, "files_deleted": delete_files}
+    logger.info("Cleared downloads", cleared=cleared_count, files_deleted=files_deleted_count)
+    return {"cleared": cleared_count, "files_deleted": files_deleted_count > 0}

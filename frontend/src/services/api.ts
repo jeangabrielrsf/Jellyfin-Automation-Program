@@ -108,8 +108,11 @@ export const downloadAPI = {
   resumeDownload: (id: number) =>
     api.post<MessageResponse>(`/downloads/${id}/resume`),
 
-  clearDownloads: (deleteFiles?: boolean) =>
-    api.delete<ClearDownloadsResponse>('/downloads/', { params: { delete_files: deleteFiles } }),
+  clearDownloads: (downloads: { id: number; delete_files: boolean }[]) =>
+    api.delete<ClearDownloadsResponse>('/downloads/', { data: { downloads } }),
+
+  getClearableDownloads: () =>
+    api.get<Download[]>('/downloads/clearable'),
 };
 
 export const settingsAPI = {
