@@ -77,6 +77,7 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
 
             {downloadToCancel && (
                 <CancelConfirmationDialog
+                    isOpen={!!downloadToCancel}
                     download={downloadToCancel}
                     onCancel={onCancel}
                     onClose={() => setDownloadToCancel(null)}
