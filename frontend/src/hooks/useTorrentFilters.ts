@@ -36,9 +36,6 @@ export function useTorrentFilters(torrents: TorrentResult[]) {
       if (selectedQualities.length > 0 && torrent.quality && !selectedQualities.includes(torrent.quality)) {
         return false;
       }
-      if (selectedLanguages.length > 0 && torrent.language && !selectedLanguages.includes(torrent.language)) {
-        return false;
-      }
       if (torrent.seeds < minSeeds) {
         return false;
       }
