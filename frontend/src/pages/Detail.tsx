@@ -778,6 +778,28 @@ const DetailPage: React.FC = () => {
               <span className="font-medium text-foreground">Status:</span> {media.status}
             </p>
           )}
+          {media.watch_providers && media.watch_providers.length > 0 && (
+            <div className="space-y-3 pt-4 border-t border-border/30">
+              <h4 className="font-display text-lg font-semibold text-foreground">Onde assistir</h4>
+              <div className="flex flex-wrap gap-3">
+                {media.watch_providers.map((provider) => (
+                  <div
+                    key={provider.provider_id}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border/30"
+                  >
+                    {provider.logo_path && (
+                      <img
+                        src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`}
+                        alt={provider.provider_name}
+                        className="w-6 h-6 rounded"
+                      />
+                    )}
+                    <span className="text-sm text-foreground">{provider.provider_name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

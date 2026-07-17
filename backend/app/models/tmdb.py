@@ -41,6 +41,13 @@ class TMDBSearchResponse(BaseModel):
     total_results: int
 
 
+class WatchProvider(BaseModel):
+    provider_id: int
+    provider_name: str
+    logo_path: Optional[str] = None
+    type: str = "flatrate"
+
+
 class TMDBDetail(BaseModel):
     id: int
     title: Optional[str] = None
@@ -65,6 +72,7 @@ class TMDBDetail(BaseModel):
     rt_url: Optional[str] = None
     seasons: List[dict] = []
     videos: Optional[dict] = None
+    watch_providers: List[WatchProvider] = []
     
     @computed_field
     @property

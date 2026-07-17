@@ -3,7 +3,7 @@ import httpx
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from app.services.config_service import get_config
-from app.models.tmdb import TMDBSearchResult, TMDBSearchResponse, TMDBDetail
+from app.models.tmdb import TMDBSearchResult, TMDBSearchResponse, TMDBDetail, WatchProvider
 from app.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -21,6 +21,29 @@ class TMDBService:
     async def close(self):
         """Close the HTTP client."""
         await self.client.aclose()
+
+    async def _get_watch_providers(self, media_type: str, media_id: int) -> List[WatchProvider]:
+        """Fetch watch providers for a media item in Brazil."""
+        url = f"{self.BASE_URL}/{media_type}/{media_id}/watch/providers"
+        params = {"api_key": self.api_key}
+        try:
+            response = await self.client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            br_providers = data.get("results", {}).get("BR", {})
+            providers = []
+            for provider_type in ["flatrate", "rent", "buy", "ads", "free"]:
+                for p in br_providers.get(provider_type, []):
+                    providers.append(WatchProvider(
+                        provider_id=p["provider_id"],
+                        provider_name=p["provider_name"],
+                        logo_path=p.get("logo_path"),
+                        type=provider_type,
+                    ))
+            return providers
+        except Exception as e:
+            logger.warning("Failed to fetch watch providers", media_type=media_type, media_id=media_id, error=str(e))
+            return []
     
     async def search(self, query: str, page: int = 1) -> TMDBSearchResponse:
         """Search for movies and TV shows."""
@@ -68,7 +91,9 @@ class TMDBService:
         
         response = await self.client.get(url, params=params)
         response.raise_for_status()
-        return TMDBDetail(**response.json())
+        detail = TMDBDetail(**response.json())
+        detail.watch_providers = await self._get_watch_providers("movie", movie_id)
+        return detail
     
     async def get_tv_detail(self, tv_id: int) -> TMDBDetail:
         """Get TV show details by ID."""
@@ -83,7 +108,9 @@ class TMDBService:
 
         response = await self.client.get(url, params=params)
         response.raise_for_status()
-        return TMDBDetail(**response.json())
+        detail = TMDBDetail(**response.json())
+        detail.watch_providers = await self._get_watch_providers("tv", tv_id)
+        return detail
 
     async def get_tv_season_detail(self, tv_id: int, season_number: int) -> dict:
         """Get season detail with episodes by TV ID and season number."""
