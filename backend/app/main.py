@@ -12,6 +12,7 @@ from app.database import init_db, SessionLocal
 from app.logging_config import setup_logging
 from app.routers import search, downloads, settings, logs, filesystem, discover, lists, recommendations, stream
 from app.services.download_worker import DownloadWorker
+from app.services.stream_service import stream_manager
 from app.exceptions import ConfigurationError
 from fastapi.responses import JSONResponse
 
@@ -100,11 +101,16 @@ async def lifespan(app: FastAPI) -> None:
     worker_task = asyncio.create_task(download_worker.start())
     app.state.download_worker = download_worker
     app.state.worker_task = worker_task
-    
+
+    # Start stream session sweeper (kills idle HLS transcode sessions)
+    stream_manager.start_sweeper()
+
     yield
     
     # Shutdown
     logger.info("Shutting down Jellyfin Automation")
+    stream_manager.stop_sweeper()
+    stream_manager.shutdown()
     worker_task.cancel()
     try:
         await worker_task

@@ -18,7 +18,7 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 
 - `source venv/bin/activate`
 - `uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload`
-- `pytest tests/ -v` — run all tests (uses SQLite in-memory, not PostgreSQL)
+- `pytest tests/ -v` — run all tests (uses SQLite in-memory, not PostgreSQL). Integration tests (real ffmpeg, `@pytest.mark.integration`) are skipped by default; run them with `pytest -m integration`.
 - `alembic upgrade head` — run migrations
 
 **Frontend (run from `frontend/`)**
@@ -39,10 +39,10 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 - **Tests:** pytest + pytest-asyncio. `conftest.py` overrides `get_db` with SQLite in-memory (`StaticPool`).
 - **Logging:** Loguru + structlog. Logs written to `backend/logs/app.log` with rotation.
 - **Models:** `download.py`, `settings.py`, `tmdb.py`, `torrent.py`, `discover.py` in `app/models/`.
-- **Routers:** `search`, `downloads`, `settings`, `logs`, `filesystem`, `discover` in `app/routers/`.
-- **Services:** `PathResolver` (`app/services/path_resolver.py`) computes save paths from torrent metadata; `DownloadWorker` (`app/services/download_worker.py`) monitors qBittorrent progress in a background loop; `OrganizerService` (`app/services/organizer_service.py`) moves completed downloads to library folders; `DiscoverService` (`app/services/discover_service.py`) provides TMDB browse sections; `JellyfinService` (`app/services/jellyfin_service.py`) triggers library scans; `OMDBService` (`app/services/omdb_service.py`) fetches Rotten Tomatoes ratings; `PathConverter` (`app/services/path_converter.py`) converts WSL2↔Windows paths; `SettingsService` (`app/services/settings_service.py`) manages settings CRUD; `ConfigService` (`app/services/config_service.py`) provides `get_config()` with DB→.env priority chain.
+- **Routers:** `search`, `downloads`, `settings`, `logs`, `filesystem`, `discover`, `stream` in `app/routers/`.
+- **Services:** `PathResolver` (`app/services/path_resolver.py`) computes save paths from torrent metadata; `DownloadWorker` (`app/services/download_worker.py`) monitors qBittorrent progress in a background loop; `OrganizerService` (`app/services/organizer_service.py`) moves completed downloads to library folders; `DiscoverService` (`app/services/discover_service.py`) provides TMDB browse sections; `JellyfinService` (`app/services/jellyfin_service.py`) triggers library scans; `OMDBService` (`app/services/omdb_service.py`) fetches Rotten Tomatoes ratings; `PathConverter` (`app/services/path_converter.py`) converts WSL2↔Windows paths; `SettingsService` (`app/services/settings_service.py`) manages settings CRUD; `ConfigService` (`app/services/config_service.py`) provides `get_config()` with DB→.env priority chain; `StreamService` (`app/services/stream_service.py`) resolves playable files, decides direct-vs-transcode via ffprobe (cached by path+mtime), and `StreamSessionManager` (module singleton `stream_manager`) runs HLS transcode sessions — ffmpeg process + segments dir keyed by `(download_id, episode)`, touch-on-request with 60s idle sweep (background thread started in lifespan), episode switch kills the previous session, capacity 3 with 503.
 - **Scrapers:** `JackettScraper` (`app/scrapers/jackett_scraper.py`) with `BaseScraper` abstract interface.
-- **Exceptions:** `ConfigurationError` in `app/exceptions.py`.
+- **Exceptions:** `ConfigurationError`, `StreamLimitError`, `StreamTranscodeError` in `app/exceptions.py`.
 - **WebSocket:** `/ws` endpoint in `app/main.py` broadcasts download updates.
 - **Health:** `/health` endpoint returns app status.
 - **Static files:** `main.py` mounts `../frontend/dist` at `/` for production serving; if missing, app starts without it.

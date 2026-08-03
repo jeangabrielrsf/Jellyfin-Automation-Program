@@ -147,6 +147,7 @@ docker-compose up --build -d
 | Python 3.12 | `sudo apt update && sudo apt install python3.12 python3.12-venv python3-pip` |
 | Node.js 20 | [NodeSource](https://github.com/nodesource/distributions) ou [nvm](https://github.com/nvm-sh/nvm) |
 | PostgreSQL 15 | `sudo apt install postgresql postgresql-contrib` |
+| ffmpeg | `sudo apt install ffmpeg` (usado para transcode on-demand de MKV/HEVC) |
 | qBittorrent | [qbittorrent.org](https://www.qbittorrent.org/download) (Windows ou WSL2) |
 | Jackett | [GitHub releases](https://github.com/Jackett/Jackett/releases) (Windows ou WSL2) |
 | Jellyfin | [jellyfin.org](https://jellyfin.org/downloads/) (Windows ou WSL2) |
