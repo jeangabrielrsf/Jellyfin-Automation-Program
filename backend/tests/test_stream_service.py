@@ -1,5 +1,8 @@
 """Tests for StreamService file resolution."""
+from unittest.mock import patch
+
 import pytest
+from app.exceptions import StreamTranscodeError
 from app.models.download import ContentType, Download, DownloadStatus
 from app.services.stream_service import StreamService
 
@@ -316,3 +319,168 @@ def test_resolve_file_missing_episode_raises(service, tmp_path):
 
     with pytest.raises(FileNotFoundError, match="S01E09"):
         service.resolve_file(download)
+
+
+class TestResolveSubtitle:
+    def test_exact_basename_match(self, service, tmp_path):
+        """The .srt sharing the video's basename wins."""
+        folder = tmp_path / "movie"
+        folder.mkdir()
+        video = folder / "Test Movie (2023) - 1080p.mp4"
+        video.write_bytes(b"v")
+        srt = folder / "Test Movie (2023) - 1080p.srt"
+        srt.write_text("1\n00:00:01,000 --> 00:00:02,000\nOi\n")
+
+        result = service.resolve_subtitle(
+            make_download(destination_folder=str(folder))
+        )
+
+        assert result == srt
+
+    def test_basename_match_is_case_insensitive(self, service, tmp_path):
+        """A .SRT extension or case difference still matches."""
+        folder = tmp_path / "movie"
+        folder.mkdir()
+        video = folder / "Test Movie.mp4"
+        video.write_bytes(b"v")
+        srt = folder / "Test Movie.SRT"
+        srt.write_text("1\n00:00:01,000 --> 00:00:02,000\nOi\n")
+
+        result = service.resolve_subtitle(
+            make_download(destination_folder=str(folder))
+        )
+
+        assert result == srt
+
+    def test_unique_srt_fallback(self, service, tmp_path):
+        """A single .srt is used when the folder has a single playable video."""
+        folder = tmp_path / "movie"
+        folder.mkdir()
+        (folder / "sample.mkv").write_bytes(b"sample")
+        (folder / "Test Movie.mkv").write_bytes(b"v")
+        srt = folder / "subs.srt"
+        srt.write_text("1\n00:00:01,000 --> 00:00:02,000\nOi\n")
+
+        result = service.resolve_subtitle(
+            make_download(destination_folder=str(folder))
+        )
+
+        assert result == srt
+
+    def test_unique_srt_fallback_skipped_for_packs(self, service, tmp_path):
+        """A pack never attaches one episode's .srt to another episode."""
+        folder = tmp_path / "season"
+        folder.mkdir()
+        (folder / "Show - S01E01 - 1080p.mkv").write_bytes(b"e1")
+        (folder / "Show - S01E02 - 1080p.mkv").write_bytes(b"e2")
+        (folder / "Show - S01E02 - 1080p.srt").write_text("srt2")
+
+        download = make_download(
+            type=ContentType.SERIES, season=1, destination_folder=str(folder)
+        )
+
+        assert service.resolve_subtitle(download, episode=1) is None
+
+    def test_ambiguous_multiple_srts_return_none(self, service, tmp_path):
+        """Multiple non-matching .srt files are ambiguous: no subtitle."""
+        folder = tmp_path / "movie"
+        folder.mkdir()
+        (folder / "Test Movie.mkv").write_bytes(b"v")
+        (folder / "legendas-en.srt").write_text("en")
+        (folder / "legendas-pt.srt").write_text("pt")
+
+        result = service.resolve_subtitle(
+            make_download(destination_folder=str(folder))
+        )
+
+        assert result is None
+
+    def test_no_srt_returns_none(self, service, tmp_path):
+        folder = tmp_path / "movie"
+        folder.mkdir()
+        (folder / "Test Movie.mkv").write_bytes(b"v")
+
+        result = service.resolve_subtitle(
+            make_download(destination_folder=str(folder))
+        )
+
+        assert result is None
+
+    def test_episode_selects_its_own_srt(self, service, tmp_path):
+        """A pack resolves the .srt of the requested episode."""
+        folder = tmp_path / "season"
+        folder.mkdir()
+        (folder / "Show - S01E01 - 1080p.mkv").write_bytes(b"e1")
+        (folder / "Show - S01E02 - 1080p.mkv").write_bytes(b"e2")
+        (folder / "Show - S01E01 - 1080p.srt").write_text("srt1")
+        srt2 = folder / "Show - S01E02 - 1080p.srt"
+        srt2.write_text("srt2")
+
+        download = make_download(
+            type=ContentType.SERIES, season=1, destination_folder=str(folder)
+        )
+
+        assert service.resolve_subtitle(download, episode=2) == srt2
+
+    def test_pack_without_episode_resolves_first_episode(self, service, tmp_path):
+        """No episode param on a pack resolves the first sorted episode's srt."""
+        folder = tmp_path / "season"
+        folder.mkdir()
+        (folder / "Show - S01E02 - 1080p.mkv").write_bytes(b"e2")
+        (folder / "Show - S01E01 - 1080p.mkv").write_bytes(b"e1")
+        srt1 = folder / "Show - S01E01 - 1080p.srt"
+        srt1.write_text("srt1")
+        (folder / "Show - S01E02 - 1080p.srt").write_text("srt2")
+
+        download = make_download(
+            type=ContentType.SERIES, season=1, destination_folder=str(folder)
+        )
+
+        assert service.resolve_subtitle(download) == srt1
+
+    def test_missing_video_propagates_file_not_found(self, service, tmp_path):
+        folder = tmp_path / "movie"
+        folder.mkdir()
+
+        with pytest.raises(FileNotFoundError, match="Nenhum arquivo de vídeo"):
+            service.resolve_subtitle(make_download(destination_folder=str(folder)))
+
+
+class TestToWebVtt:
+    def test_converts_srt_via_ffmpeg(self, service, tmp_path):
+        """Runs ffmpeg -f webvtt and returns its stdout."""
+        srt = tmp_path / "movie.srt"
+        srt.write_text("1\n00:00:01,000 --> 00:00:02,000\nOi\n")
+
+        with patch("app.services.stream_service.subprocess.run") as run:
+            run.return_value.stdout = "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nOi\n"
+            run.return_value.returncode = 0
+            result = service.to_webvtt(srt)
+
+        cmd = run.call_args.args[0]
+        assert "ffmpeg" in cmd
+        assert cmd[cmd.index("-f") + 1] == "webvtt"
+        assert str(srt) in cmd
+        assert result == "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nOi\n"
+
+    def test_ffmpeg_failure_raises(self, service, tmp_path):
+        srt = tmp_path / "movie.srt"
+        srt.write_text("broken")
+
+        with patch("app.services.stream_service.subprocess.run") as run:
+            run.return_value.returncode = 1
+            run.return_value.stdout = ""
+
+            with pytest.raises(StreamTranscodeError, match="legenda"):
+                service.to_webvtt(srt)
+
+    def test_missing_binary_raises(self, service, tmp_path):
+        srt = tmp_path / "movie.srt"
+        srt.write_text("1\n00:00:01,000 --> 00:00:02,000\nOi\n")
+
+        with patch(
+            "app.services.stream_service.subprocess.run",
+            side_effect=FileNotFoundError("ffmpeg"),
+        ):
+            with pytest.raises(StreamTranscodeError, match="legenda"):
+                service.to_webvtt(srt)

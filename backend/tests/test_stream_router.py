@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from app.exceptions import StreamTranscodeError
 from app.models.download import ContentType, Download, DownloadStatus
 from app.services.stream_service import StreamService, stream_manager
 from tests.stream_helpers import H264_PROBE, HEVC_PROBE, make_fake_launch
@@ -174,6 +175,138 @@ class TestPlaybackEndpoint:
 
         assert response.status_code == 404
         assert "não encontrado" in response.json()["detail"]
+
+
+class TestSubtitleEndpoint:
+    SAMPLE_WEBVTT = "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nOi\n"
+
+    def test_playback_includes_subtitle_url_with_srt(self, client, db_session, tmp_path):
+        folder = tmp_path / "movie"
+        folder.mkdir()
+        video = folder / "Movie (2023) - 1080p.mp4"
+        video.write_bytes(b"x" * 1000)
+        (folder / "Movie (2023) - 1080p.srt").write_text("1\n00:00:01,000 --> 00:00:02,000\nOi\n")
+        download = create_download(db_session, destination_folder=str(folder))
+
+        with patch.object(StreamService, "_ffprobe", return_value=H264_PROBE):
+            response = client.get(f"/api/downloads/{download.id}/playback")
+
+        assert response.status_code == 200
+        assert response.json()["subtitle_url"] == f"/api/stream/{download.id}/subtitle.vtt"
+
+    def test_playback_omits_subtitle_url_without_srt(self, client, db_session, tmp_path):
+        folder = tmp_path / "movie"
+        folder.mkdir()
+        (folder / "Movie (2023) - 1080p.mp4").write_bytes(b"x" * 1000)
+        download = create_download(db_session, destination_folder=str(folder))
+
+        with patch.object(StreamService, "_ffprobe", return_value=H264_PROBE):
+            response = client.get(f"/api/downloads/{download.id}/playback")
+
+        assert response.status_code == 200
+        assert "subtitle_url" not in response.json()
+
+    def test_playback_subtitle_url_carries_episode_for_packs(
+        self, client, db_session, tmp_path
+    ):
+        """A pack's subtitle_url targets the first episode's srt."""
+        folder = tmp_path / "season"
+        folder.mkdir()
+        (folder / "Show - S01E01 - 1080p.mp4").write_bytes(b"e1")
+        (folder / "Show - S01E02 - 1080p.mp4").write_bytes(b"e2")
+        (folder / "Show - S01E01 - 1080p.srt").write_text("srt1")
+        download = create_download(
+            db_session,
+            type=ContentType.SERIES,
+            title="Show",
+            season=1,
+            destination_folder=str(folder),
+        )
+
+        with patch.object(StreamService, "_ffprobe", return_value=H264_PROBE):
+            response = client.get(f"/api/downloads/{download.id}/playback")
+
+        assert response.status_code == 200
+        assert (
+            response.json()["subtitle_url"]
+            == f"/api/stream/{download.id}/subtitle.vtt?episode=1"
+        )
+
+    def test_subtitle_serves_webvtt(self, client, db_session, tmp_path):
+        folder = tmp_path / "movie"
+        folder.mkdir()
+        (folder / "Movie.mp4").write_bytes(b"x" * 1000)
+        (folder / "Movie.srt").write_text("1\n00:00:01,000 --> 00:00:02,000\nOi\n")
+        download = create_download(db_session, destination_folder=str(folder))
+
+        with patch.object(StreamService, "to_webvtt", return_value=self.SAMPLE_WEBVTT) as convert:
+            response = client.get(f"/api/stream/{download.id}/subtitle.vtt")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/vtt")
+        assert response.text == self.SAMPLE_WEBVTT
+        convert.assert_called_once()
+
+    def test_subtitle_honors_episode_param(self, client, db_session, tmp_path):
+        """?episode=N resolves that episode's srt."""
+        folder = tmp_path / "season"
+        folder.mkdir()
+        (folder / "Show - S01E01 - 1080p.mp4").write_bytes(b"e1")
+        (folder / "Show - S01E02 - 1080p.mp4").write_bytes(b"e2")
+        (folder / "Show - S01E02 - 1080p.srt").write_text("srt2")
+        download = create_download(
+            db_session,
+            type=ContentType.SERIES,
+            title="Show",
+            season=1,
+            destination_folder=str(folder),
+        )
+
+        with patch.object(StreamService, "to_webvtt", return_value=self.SAMPLE_WEBVTT) as convert:
+            response = client.get(f"/api/stream/{download.id}/subtitle.vtt?episode=2")
+
+        assert response.status_code == 200
+        srt_arg = convert.call_args.args[0]
+        assert srt_arg.name == "Show - S01E02 - 1080p.srt"
+
+    def test_subtitle_without_srt_404(self, client, db_session, tmp_path):
+        folder = tmp_path / "movie"
+        folder.mkdir()
+        (folder / "Movie.mp4").write_bytes(b"x" * 1000)
+        download = create_download(db_session, destination_folder=str(folder))
+
+        response = client.get(f"/api/stream/{download.id}/subtitle.vtt")
+
+        assert response.status_code == 404
+        assert "Legenda" in response.json()["detail"]
+
+    def test_subtitle_missing_folder_404(self, client, db_session, tmp_path):
+        download = create_download(db_session, destination_folder=str(tmp_path / "gone"))
+
+        response = client.get(f"/api/stream/{download.id}/subtitle.vtt")
+
+        assert response.status_code == 404
+
+    def test_subtitle_conversion_failure_500(self, client, db_session, tmp_path):
+        folder = tmp_path / "movie"
+        folder.mkdir()
+        (folder / "Movie.mp4").write_bytes(b"x" * 1000)
+        (folder / "Movie.srt").write_text("broken")
+        download = create_download(db_session, destination_folder=str(folder))
+
+        with patch.object(
+            StreamService,
+            "to_webvtt",
+            side_effect=StreamTranscodeError("Falha ao converter"),
+        ):
+            response = client.get(f"/api/stream/{download.id}/subtitle.vtt")
+
+        assert response.status_code == 500
+
+    def test_subtitle_download_not_found(self, client, db_session):
+        response = client.get("/api/stream/999/subtitle.vtt")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Download not found"
 
 
 class TestStreamEndpoint:

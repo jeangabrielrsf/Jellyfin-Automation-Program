@@ -52,6 +52,14 @@ function WatchPage() {
     return null;
   }, [error, downloadError]);
 
+  const subtitleUrl = useMemo(() => {
+    const url = playback?.subtitle_url;
+    if (!url) return undefined;
+    const episode = activeFile?.episode;
+    if (episode == null || !/episode=\d+/.test(url)) return url;
+    return url.replace(/episode=\d+/, `episode=${episode}`);
+  }, [playback?.subtitle_url, activeFile?.episode]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !activeFile) return;
@@ -131,8 +139,8 @@ function WatchPage() {
             autoPlay
             className="w-full aspect-video bg-black rounded-lg"
           >
-            {playback?.subtitle_url && (
-              <track kind="subtitles" src={playback.subtitle_url} srcLang="pt" label="Legendas" default />
+            {subtitleUrl && (
+              <track key={subtitleUrl} kind="subtitles" src={subtitleUrl} srcLang="pt" label="Legendas" default />
             )}
           </video>
         </div>

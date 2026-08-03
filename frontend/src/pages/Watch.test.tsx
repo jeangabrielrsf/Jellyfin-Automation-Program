@@ -290,6 +290,47 @@ describe('WatchPage', () => {
       expect(track).not.toBeNull();
       expect(track?.getAttribute('src')).toBe('/api/stream/1/subtitle.vtt');
     });
+
+    it('does not attach a track without subtitle_url', async () => {
+      vi.mocked(api.downloadAPI.getDownload).mockResolvedValue(mockResponse(movieDownload));
+      vi.mocked(api.downloadAPI.getPlayback).mockResolvedValue(
+        mockResponse<PlaybackResponse>({
+          mode: 'direct',
+          files: [{ episode: null, title: 'Test Movie', mode: 'direct', url: '/api/stream/1/playlist.m3u8' }],
+        })
+      );
+
+      renderWatch(1);
+
+      const video = await screen.findByTestId('watch-video') as HTMLVideoElement;
+      expect(video.querySelector('track')).toBeNull();
+    });
+
+    it('swaps the subtitle track src for the active episode in a pack', async () => {
+      vi.mocked(api.downloadAPI.getDownload).mockResolvedValue(mockResponse(seriesDownload));
+      vi.mocked(api.downloadAPI.getPlayback).mockResolvedValue(
+        mockResponse<PlaybackResponse>({
+          mode: 'direct',
+          files: [
+            { episode: 1, title: 'Episódio 1', mode: 'direct', url: '/api/stream/2/playlist.m3u8?episode=1' },
+            { episode: 2, title: 'Episódio 2', mode: 'direct', url: '/api/stream/2/playlist.m3u8?episode=2' },
+          ],
+          subtitle_url: '/api/stream/2/subtitle.vtt?episode=1',
+        })
+      );
+
+      renderWatch(2);
+
+      await vi.waitFor(() => {
+        expect(getVideo().querySelector('track')?.getAttribute('src')).toBe('/api/stream/2/subtitle.vtt?episode=1');
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /episódio 2/i }));
+
+      await vi.waitFor(() => {
+        expect(getVideo().querySelector('track')?.getAttribute('src')).toBe('/api/stream/2/subtitle.vtt?episode=2');
+      });
+    });
   });
 
   describe('error states', () => {

@@ -132,3 +132,24 @@ class TestEndToEnd:
         assert stream.status_code == 200
         assert stream.headers["content-type"] == "video/mp4"
         assert len(stream.content) > 0
+
+
+class TestSubtitleConversion:
+    def test_srt_converted_to_webvtt_with_preserved_timestamps(self, tmp_path):
+        """Real ffmpeg conversion: SRT timestamps survive as WebVTT."""
+        if not ffmpeg_available():
+            pytest.skip("ffmpeg/ffprobe not installed")
+        srt = tmp_path / "movie.srt"
+        srt.write_text(
+            "1\n00:00:01,000 --> 00:00:02,500\nOlá mundo\n\n"
+            "2\n00:00:05,000 --> 00:00:07,250\nSegunda legenda\n"
+        )
+
+        webvtt = StreamService().to_webvtt(srt)
+
+        # ffmpeg drops the leading hour field when zero (00:00:01.000 → 00:01.000).
+        assert webvtt.startswith("WEBVTT")
+        assert "00:01.000 --> 00:02.500" in webvtt
+        assert "00:05.000 --> 00:07.250" in webvtt
+        assert "Olá mundo" in webvtt
+        assert "Segunda legenda" in webvtt

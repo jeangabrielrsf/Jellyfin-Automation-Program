@@ -2,7 +2,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -17,6 +17,7 @@ logger = get_logger(__name__)
 
 HLS_MEDIA_TYPE = "application/vnd.apple.mpegurl"
 SEGMENT_MEDIA_TYPE = "video/mp2t"
+SUBTITLE_MEDIA_TYPE = "text/vtt"
 
 
 def _get_download(download_id: int, db: Session) -> Download:
@@ -27,12 +28,17 @@ def _get_download(download_id: int, db: Session) -> Download:
     return download
 
 
+def _endpoint_url(download_id: int, endpoint: str, episode: Optional[int]) -> str:
+    """Build a stream endpoint URL, appending the episode when present."""
+    url = f"/api/stream/{download_id}/{endpoint}"
+    if episode is not None:
+        url += f"?episode={episode}"
+    return url
+
+
 def _file_url(download_id: int, entry: dict) -> str:
     """Build the stream URL for a resolved file entry."""
-    url = f"/api/stream/{download_id}/playlist.m3u8"
-    if entry["episode"] is not None:
-        url += f"?episode={entry['episode']}"
-    return url
+    return _endpoint_url(download_id, "playlist.m3u8", entry["episode"])
 
 
 @playback_router.get("/{download_id}/playback")
@@ -48,10 +54,12 @@ def get_playback(download_id: int, db: Session = Depends(get_db)):
     try:
         files = service.resolve_files(download)
         modes = [service.decide_mode(entry["path"]) for entry in files]
+        first = files[0]
+        subtitle = service.resolve_subtitle(download, episode=first["episode"])
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-    return {
+    payload = {
         "mode": "transcode" if "transcode" in modes else "direct",
         "files": [
             {
@@ -63,6 +71,9 @@ def get_playback(download_id: int, db: Session = Depends(get_db)):
             for entry, mode in zip(files, modes)
         ],
     }
+    if subtitle is not None:
+        payload["subtitle_url"] = _endpoint_url(download_id, "subtitle.vtt", first["episode"])
+    return payload
 
 
 @stream_router.get("/{download_id}/playlist.m3u8")
@@ -99,6 +110,35 @@ def stream_playlist(
 
     logger.info("Streaming HLS playlist", download_id=download_id, episode=episode)
     return FileResponse(session.playlist_path(), media_type=HLS_MEDIA_TYPE)
+
+
+@stream_router.get("/{download_id}/subtitle.vtt")
+def stream_subtitle(
+    download_id: int,
+    episode: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    """Serve the .srt sidecar of a download as WebVTT.
+
+    The .srt next to the resolved video is converted on-demand with ffmpeg
+    (`-f webvtt`) and served without state. `episode` selects the episode's
+    own sidecar for series packs. Registered before the segment route so
+    the literal path wins over `/{download_id}/{filename}`.
+    """
+    download = _get_download(download_id, db)
+    service = StreamService()
+    try:
+        srt_path = service.resolve_subtitle(download, episode=episode)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    if srt_path is None:
+        raise HTTPException(status_code=404, detail="Legenda não encontrada para este conteúdo")
+    try:
+        webvtt = service.to_webvtt(srt_path)
+    except StreamTranscodeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    logger.info("Serving subtitle", download_id=download_id, episode=episode, path=str(srt_path))
+    return Response(content=webvtt, media_type=SUBTITLE_MEDIA_TYPE)
 
 
 @stream_router.get("/{download_id}/{filename}")

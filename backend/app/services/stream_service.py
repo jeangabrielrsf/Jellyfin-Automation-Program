@@ -25,6 +25,7 @@ class StreamService:
     """
 
     VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.m4v', '.webm'}
+    SUBTITLE_EXTENSIONS = {'.srt'}
     EXCLUDED_KEYWORDS = ('sample', 'trailer', 'extra', 'featurette')
     EPISODE_PATTERN = re.compile(r"[Ss](\d{1,2})[Ee](\d{1,2})")
 
@@ -83,6 +84,65 @@ class StreamService:
         """
         folder = self.resolve_folder(download)
         return self._resolve_entries(download, folder, requested_episode=episode)[0]["path"]
+
+    def resolve_subtitle(self, download, episode: Optional[int] = None) -> Optional[Path]:
+        """Resolve the .srt sidecar next to the video for a download.
+
+        The video is resolved first (same rules as resolve_file), then the
+        .srt in the video's directory is looked up: an exact basename match
+        wins; otherwise a single .srt is used, but only when the folder has
+        a single playable video (so a pack never attaches one episode's
+        subtitles to another). Returns None when no .srt resolves.
+
+        Raises:
+            FileNotFoundError: When the video itself cannot be resolved.
+        """
+        video = self.resolve_file(download, episode)
+        folder = video.parent
+        srts = sorted(
+            path
+            for path in folder.iterdir()
+            if path.is_file()
+            and path.suffix.lower() in self.SUBTITLE_EXTENSIONS
+            and not self._is_excluded(path, folder)
+        )
+        for srt in srts:
+            if srt.stem.lower() == video.stem.lower():
+                return srt
+        videos = [
+            path
+            for path in folder.iterdir()
+            if path.is_file()
+            and path.suffix.lower() in self.VIDEO_EXTENSIONS
+            and not self._is_excluded(path, folder)
+        ]
+        if len(srts) == 1 and len(videos) == 1:
+            return srts[0]
+        return None
+
+    def to_webvtt(self, srt_path: Path) -> str:
+        """Convert an .srt file to WebVTT text via ffmpeg (-f webvtt).
+
+        Raises:
+            StreamTranscodeError: When ffmpeg is missing, times out or fails.
+        """
+        cmd = [
+            "ffmpeg", "-v", "error", "-nostdin",
+            "-i", str(srt_path),
+            "-f", "webvtt",
+            "pipe:1",
+        ]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+            raise StreamTranscodeError(
+                f"Falha ao converter a legenda {srt_path.name}: {exc}"
+            ) from exc
+        if result.returncode != 0:
+            raise StreamTranscodeError(
+                f"Falha ao converter a legenda {srt_path.name} para WebVTT"
+            )
+        return result.stdout
 
     def _resolve_entries(
         self, download, folder: Path, requested_episode: Optional[int] = None
