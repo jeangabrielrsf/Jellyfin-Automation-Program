@@ -8,6 +8,7 @@ import SettingsPage from './pages/Settings';
 import LogsPage from './pages/Logs';
 import DiscoverPage from './pages/Discover';
 import WatchlistPage from './pages/Watchlist';
+import WatchPage from './pages/Watch';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           <Route path="/detail/:mediaType/:id" element={<DetailPage />} />
           <Route path="/downloads" element={<DownloadsPage />} />
           <Route path="/watchlist" element={<WatchlistPage />} />
+          <Route path="/watch/:downloadId" element={<WatchPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/logs" element={<LogsPage />} />
         </Routes>

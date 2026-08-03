@@ -202,6 +202,21 @@ export interface AlternativeTitle {
   title: string;
 }
 
+export type PlaybackMode = 'direct' | 'transcode';
+
+export interface PlaybackFile {
+  episode: number | null;
+  title: string;
+  mode: PlaybackMode;
+  url: string;
+}
+
+export interface PlaybackResponse {
+  mode: PlaybackMode;
+  files: PlaybackFile[];
+  subtitle_url?: string;
+}
+
 export interface DownloadCreateResponse extends Download {
   already_exists?: boolean;
   updated_at?: string;

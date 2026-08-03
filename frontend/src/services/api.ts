@@ -6,6 +6,7 @@ import type {
   MessageResponse, ClearDownloadsResponse, SettingsResponse, SettingUpdateResponse,
   RootResponse, DirsResponse, DiskSpaceResponse, LogsResponse,
   SectionCatalog, DiscoverSection, Genre, StreamingProvider,
+  PlaybackResponse,
 } from '@/types';
 
 export type { DiskSpaceResponse };
@@ -113,6 +114,12 @@ export const downloadAPI = {
 
   getClearableDownloads: () =>
     api.get<Download[]>('/downloads/clearable'),
+
+  getDownload: (id: number) =>
+    api.get<Download>(`/downloads/${id}`),
+
+  getPlayback: (id: number) =>
+    api.get<PlaybackResponse>(`/downloads/${id}/playback`),
 };
 
 export const settingsAPI = {
