@@ -2,10 +2,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Download, Play, Info, Search, Star, Calendar, Loader2, ChevronDown, Filter, SortAsc, SortDesc } from 'lucide-react';
-import { searchAPI } from '../services/api';
+import { searchAPI, downloadAPI } from '../services/api';
 import { TorrentResult, TVEpisode } from '../types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MediaActions } from '@/components/MediaActions';
+import { WatchNowButton } from '@/components/WatchNowButton';
 import { RecommendationsRow } from '@/components/RecommendationsRow';
 import { useTorrentFilters } from '@/hooks/useTorrentFilters';
 import { useDownload } from '@/hooks/useDownload';
@@ -68,6 +69,13 @@ const DetailPage: React.FC = () => {
         ? searchAPI.getMovieAlternativeTitles(tmdbId)
         : searchAPI.getTVAlternativeTitles(tmdbId),
     enabled: !!tmdbId && !!mediaType,
+  });
+
+  const { data: downloadsData } = useQuery({
+    queryKey: ['detail-downloads', tmdbId],
+    queryFn: () => downloadAPI.listDownloads({ tmdb_id: tmdbId }).then((r) => r.data),
+    enabled: !!tmdbId,
+    refetchInterval: 10000,
   });
 
   const { data: torrentResults, isLoading: torrentsLoading, refetch: refetchTorrents } = useQuery({
@@ -249,6 +257,7 @@ const DetailPage: React.FC = () => {
               </div>
             )}
             <div className="flex items-center gap-3 mt-3 flex-wrap">
+              <WatchNowButton downloads={downloadsData} />
               {trailerKey ? (
                 <button
                   onClick={() => setTrailerOpen(true)}

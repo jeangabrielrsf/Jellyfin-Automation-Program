@@ -77,8 +77,8 @@ export const searchAPI = {
 };
 
 export const downloadAPI = {
-  listDownloads: (status?: string) =>
-    api.get<Download[]>('/downloads/', { params: { status } }),
+  listDownloads: (params?: { status?: string; tmdb_id?: number }) =>
+    api.get<Download[]>('/downloads/', { params }),
   
   createDownload: (data: {
     tmdb_id: number;

@@ -44,6 +44,7 @@ class ClearDownloadsRequest(BaseModel):
 @router.get("/")
 def list_downloads(
     status: Optional[DownloadStatus] = None,
+    tmdb_id: Optional[int] = Query(None, description="Filter by TMDB media id"),
     db: Session = Depends(get_db)
 ):
     """List all downloads with optional status filter. Excludes CLEARED by default."""
@@ -52,6 +53,8 @@ def list_downloads(
         query = query.filter(Download.status == status)
     else:
         query = query.filter(Download.status != DownloadStatus.CLEARED)
+    if tmdb_id is not None:
+        query = query.filter(Download.tmdb_id == tmdb_id)
     return query.order_by(Download.created_at.desc()).all()
 
 @router.post("/")

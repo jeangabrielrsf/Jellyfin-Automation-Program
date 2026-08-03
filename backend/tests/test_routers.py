@@ -301,6 +301,54 @@ class TestDownloadsRouter:
         assert response.status_code == 200
         assert response.json() == []
 
+    def test_list_downloads_filter_by_tmdb_id(self, client, db_session):
+        """tmdb_id filter returns only downloads for that media."""
+        first = Download(
+            tmdb_id=100,
+            title="First Movie",
+            type=ContentType.MOVIE,
+            torrent_name="First",
+            status=DownloadStatus.ORGANIZED,
+        )
+        second = Download(
+            tmdb_id=100,
+            title="Second Movie",
+            type=ContentType.MOVIE,
+            torrent_name="Second",
+            status=DownloadStatus.COMPLETED,
+        )
+        other = Download(
+            tmdb_id=200,
+            title="Other Movie",
+            type=ContentType.MOVIE,
+            torrent_name="Other",
+            status=DownloadStatus.ORGANIZED,
+        )
+        db_session.add_all([first, second, other])
+        db_session.commit()
+
+        response = client.get("/api/downloads/?tmdb_id=100")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+        assert {d["id"] for d in data} == {first.id, second.id}
+
+    def test_list_downloads_tmdb_id_filter_excludes_cleared(self, client, db_session):
+        """tmdb_id filter keeps the default CLEARED exclusion."""
+        cleared = Download(
+            tmdb_id=100,
+            title="Cleared Movie",
+            type=ContentType.MOVIE,
+            torrent_name="Cleared",
+            status=DownloadStatus.CLEARED,
+        )
+        db_session.add(cleared)
+        db_session.commit()
+
+        response = client.get("/api/downloads/?tmdb_id=100")
+        assert response.status_code == 200
+        assert response.json() == []
+
     def test_create_download(self, client, db_session):
         """Test creating a download."""
         payload = {
