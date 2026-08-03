@@ -251,6 +251,66 @@ async def cancel_download(
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error")
 
+@router.delete("/")
+async def clear_downloads(
+    payload: ClearDownloadsRequest,
+    db: Session = Depends(get_db)
+):
+    """Clear the selected downloads from the list.
+
+    Finished downloads are marked CLEARED; active ones are cancelled (kept
+    in the list). Torrents are removed from qBittorrent (files kept) and,
+    when requested, the download folder is deleted from disk.
+    """
+    service = QBittorrentService(db=db)
+    cleared = 0
+    files_deleted = False
+    try:
+        for item in payload.downloads:
+            download = db.query(Download).filter(Download.id == item.id).first()
+            if not download:
+                continue
+
+            is_active = download.status in {
+                DownloadStatus.PENDING,
+                DownloadStatus.DOWNLOADING,
+            }
+            if download.torrent_hash:
+                try:
+                    await service.delete_torrent(download.torrent_hash, delete_files=False)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to remove torrent from qBittorrent",
+                        download_id=download.id,
+                        error=str(e),
+                    )
+
+            if item.delete_files:
+                for folder in [download.source_folder, download.destination_folder]:
+                    if not folder:
+                        continue
+                    try:
+                        path = Path(folder)
+                        if path.exists() and path.is_dir():
+                            shutil.rmtree(path)
+                            logger.info("Deleted download folder", path=str(path))
+                    except Exception as e:
+                        logger.warning("Failed to delete folder", path=folder, error=str(e))
+                files_deleted = True
+
+            if is_active:
+                download.transition_to(DownloadStatus.CANCELLED)
+            else:
+                download.transition_to(DownloadStatus.CLEARED)
+                cleared += 1
+        db.commit()
+    finally:
+        await service.close()
+
+    logger.info("Cleared downloads", cleared=cleared)
+    return {"cleared": cleared, "files_deleted": files_deleted}
+
+
 @router.post("/{download_id}/pause")
 async def pause_download(download_id: int, db: Session = Depends(get_db)):
     """Pause a download in qBittorrent."""

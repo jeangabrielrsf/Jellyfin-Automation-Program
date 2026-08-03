@@ -2,7 +2,7 @@
 from typing import Optional
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class TorrentResult(BaseModel):
     title: str
@@ -21,8 +21,7 @@ class TorrentResult(BaseModel):
     download_volume_factor: Optional[float] = None
     files: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TorrentSearchRequest(BaseModel):
     query: str
