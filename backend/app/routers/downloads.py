@@ -148,6 +148,13 @@ async def create_download(
                     if torrents:
                         torrent_hash = torrents[0].get("hash")
                         logger.info("Hash obtido via tag", download_id=db_download.id, hash=torrent_hash)
+                    else:
+                        logger.warning(
+                            "Torrent não encontrado via tag após upload; hash ficará NULL "
+                            "até o DownloadWorker fazer o backfill por source_folder",
+                            download_id=db_download.id,
+                            tag=tag,
+                        )
                 except Exception as e:
                     logger.warning("Falha ao obter hash via tag", download_id=db_download.id, error=str(e))
             if torrent_hash:

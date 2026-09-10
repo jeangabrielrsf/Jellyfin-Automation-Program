@@ -74,7 +74,21 @@ class DownloadWorker:
 
                 for download in downloads:
                     if not download.torrent_hash:
-                        continue
+                        matched = self._find_torrent_by_path(download, torrents)
+                        if matched:
+                            download.torrent_hash = matched["hash"]
+                            logger.info(
+                                "Hash backfilled por source_folder",
+                                download_id=download.id,
+                                torrent_hash=matched["hash"],
+                            )
+                        else:
+                            logger.warning(
+                                "Download sem torrent_hash e sem match no qBittorrent",
+                                download_id=download.id,
+                                source_folder=download.source_folder,
+                            )
+                            continue
 
                     torrent = torrent_map.get(download.torrent_hash.lower())
                     if not torrent:
@@ -222,6 +236,41 @@ class DownloadWorker:
         finally:
             await service.close()
     
+    @staticmethod
+    def _find_torrent_by_path(download: Download, torrents: list) -> Optional[dict]:
+        """Match a hash-less download to a qBittorrent torrent via save_path.
+
+        Returns the matched torrent dict, or None when ambiguous/missing.
+        """
+        target = (download.source_folder or "").rstrip("/")
+        if not target:
+            return None
+
+        candidates = [
+            torrent
+            for torrent in torrents
+            if (torrent.get("save_path") or "").rstrip("/") == target
+        ]
+        if len(candidates) == 1:
+            return candidates[0]
+
+        name_matches = [
+            torrent
+            for torrent in candidates
+            if torrent.get("name") == download.torrent_name
+        ]
+        if len(name_matches) == 1:
+            return name_matches[0]
+
+        if candidates:
+            logger.warning(
+                "Múltiplos torrents no mesmo save_path; hash não backfilled",
+                download_id=download.id,
+                source_folder=target,
+                candidates=len(candidates),
+            )
+        return None
+
     @staticmethod
     def _format_speed(speed_bytes: int) -> str:
         """Format download speed in human readable format."""
