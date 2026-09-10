@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { downloadAPI } from '@/services/api';
 import { TorrentResult } from '@/types';
 
@@ -19,6 +20,7 @@ export function useDownload({
   selectedEpisode,
 }: UseDownloadParams) {
   const [downloadingTorrents, setDownloadingTorrents] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
 
   const handleDownload = async (torrent: TorrentResult) => {
     const torrentKey = torrent.title + torrent.indexer;
@@ -49,6 +51,9 @@ export function useDownload({
       } else {
         toast.success('Download iniciado com sucesso!');
       }
+
+      queryClient.invalidateQueries({ queryKey: ['downloads'] });
+      queryClient.invalidateQueries({ queryKey: ['detail-downloads', tmdbId] });
     } catch (error) {
       console.error('Failed to start download:', error);
       toast.error('Erro ao iniciar download.');
