@@ -1,16 +1,9 @@
 """Discover Pydantic models."""
 from typing import Optional, List
 
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel
 
 from app.models.tmdb import TMDBSearchResult
-
-
-class DiscoverParams(BaseModel):
-    genre_id: Optional[int] = None
-    media_type: Optional[str] = None
-    sort_by: str = "popularity.desc"
-    watch_provider_id: Optional[int] = None
 
 
 class BannerMedia(BaseModel):
