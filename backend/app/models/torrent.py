@@ -22,10 +22,3 @@ class TorrentResult(BaseModel):
     files: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
-
-class TorrentSearchRequest(BaseModel):
-    query: str
-    media_type: str
-    quality: Optional[str] = "1080p"
-    language: Optional[str] = "legendado"
-    tmdb_id: Optional[int] = None

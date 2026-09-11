@@ -90,7 +90,3 @@ class TMDBDetail(BaseModel):
     @property
     def is_animation(self) -> bool:
         return any(g.get("name", "").lower() == "animation" for g in self.genres)
-    
-    @property
-    def studios(self) -> List[str]:
-        return []

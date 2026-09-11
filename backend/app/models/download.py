@@ -108,14 +108,6 @@ class Download(Base):
             return match.group(1).lower()
         return None
 
-    def is_active(self) -> bool:
-        """Check if download is in an active state."""
-        return self.status in {
-            DownloadStatus.PENDING,
-            DownloadStatus.DOWNLOADING,
-            DownloadStatus.COMPLETED,
-        }
-
     def to_dict(self) -> dict:
         """Serialize Download to a dict."""
         return {

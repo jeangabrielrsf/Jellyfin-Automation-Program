@@ -331,7 +331,6 @@ async def pause_download(download_id: int, db: Session = Depends(get_db)):
     if not download.torrent_hash:
         raise HTTPException(status_code=400, detail="No torrent hash associated with this download")
     
-    from app.services.qbittorrent_service import QBittorrentService
     service = QBittorrentService(db=db)
     success = await service.pause_torrent(download.torrent_hash)
     await service.close()
@@ -351,7 +350,6 @@ async def resume_download(download_id: int, db: Session = Depends(get_db)):
     if not download.torrent_hash:
         raise HTTPException(status_code=400, detail="No torrent hash associated with this download")
     
-    from app.services.qbittorrent_service import QBittorrentService
     service = QBittorrentService(db=db)
     success = await service.resume_torrent(download.torrent_hash)
     await service.close()
@@ -361,57 +359,3 @@ async def resume_download(download_id: int, db: Session = Depends(get_db)):
     
     return {"message": "Download resumed"}
 
-@router.get("/clearable")
-def list_clearable_downloads(db: Session = Depends(get_db)):
-    """List all downloads that can be cleared (completed, failed, cancelled, organized)."""
-    clearable_statuses = [
-        DownloadStatus.COMPLETED,
-        DownloadStatus.FAILED,
-        DownloadStatus.CANCELLED,
-        DownloadStatus.ORGANIZED,
-    ]
-    return db.query(Download).filter(
-        Download.status.in_(clearable_statuses)
-    ).order_by(Download.created_at.desc()).all()
-
-@router.delete("/")
-async def delete_all_downloads(
-    request: ClearDownloadsRequest,
-    db: Session = Depends(get_db)
-):
-    """Clear selected downloads from the list. Each item can optionally delete files from disk."""
-    
-    cleared_count = 0
-    files_deleted_count = 0
-    
-    for item in request.downloads:
-        download = db.query(Download).filter(Download.id == item.id).first()
-        if not download:
-            continue
-        
-        if download.status in {DownloadStatus.PENDING, DownloadStatus.DOWNLOADING}:
-            continue
-        
-        if item.delete_files:
-            folders_to_check = [download.source_folder, download.destination_folder]
-            for folder in folders_to_check:
-                if folder:
-                    try:
-                        path = Path(folder)
-                        if path.exists() and path.is_dir():
-                            shutil.rmtree(path)
-                            logger.info("Deleted download folder", path=str(path))
-                            files_deleted_count += 1
-                    except Exception as e:
-                        logger.warning("Failed to delete folder", path=folder, error=str(e))
-        
-        try:
-            download.transition_to(DownloadStatus.CLEARED)
-            cleared_count += 1
-        except Exception:
-            logger.warning("Failed to clear download", download_id=download.id)
-    
-    db.commit()
-    
-    logger.info("Cleared downloads", cleared=cleared_count, files_deleted=files_deleted_count)
-    return {"cleared": cleared_count, "files_deleted": files_deleted_count > 0}
