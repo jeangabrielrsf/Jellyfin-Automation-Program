@@ -1,30 +1,18 @@
-"""Combines TMDB similar + recommendations, dedupes, applies exclusion set, caches."""
+"""Combines TMDB similar + recommendations, dedupes, applies exclusion set."""
 import asyncio
-import time
 
 from app.services.list_service import ListService
 
 
 class RecommendationService:
-    CACHE_TTL_SECONDS = 3600
-
     def __init__(self, db, tmdb):
         self.db = db
         self.tmdb = tmdb
-        self._cache: dict[tuple[str, int], tuple[float, list[dict]]] = {}
 
     async def get_recommendations(
         self, media_type: str, tmdb_id: int, *, limit: int = 10
     ) -> list[dict]:
-        key = (media_type, tmdb_id)
-        now = time.time()
-
-        cached = self._cache.get(key)
-        if cached is not None and now - cached[0] < self.CACHE_TTL_SECONDS:
-            raw = cached[1]
-        else:
-            raw = await self._fetch_union(media_type, tmdb_id)
-            self._cache[key] = (now, raw)
+        raw = await self._fetch_union(media_type, tmdb_id)
 
         excluded = ListService(self.db).excluded_tmdb_ids(media_type)
 
@@ -46,15 +34,10 @@ class RecommendationService:
         return result
 
     async def _fetch_union(self, media_type: str, tmdb_id: int) -> list[dict]:
-        if media_type == "movie":
-            similar_task = self.tmdb.get_similar_movies(tmdb_id)
-            recs_task = self.tmdb.get_recommendations_movies(tmdb_id)
-        else:
-            similar_task = self.tmdb.get_similar_tv(tmdb_id)
-            recs_task = self.tmdb.get_recommendations_tv(tmdb_id)
-
         similar, recs = await asyncio.gather(
-            similar_task, recs_task, return_exceptions=True
+            self.tmdb.get_similar(media_type, tmdb_id),
+            self.tmdb.get_recommendations(media_type, tmdb_id),
+            return_exceptions=True,
         )
         for result in (similar, recs):
             if isinstance(result, BaseException):
