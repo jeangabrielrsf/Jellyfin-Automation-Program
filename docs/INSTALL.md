@@ -429,7 +429,7 @@ Procure pelo endereço que começa com `192.168.x.x` ou `10.x.x.x`.
 3. Reinicie o navegador e teste `http://jellyfin.local`
 
 **Por que `127.0.0.1` e não o IP da LAN (ex: `192.168.10.100`)?**
-No WSL2 com `networkingMode=mirrored`, o host Windows **não consegue** acessar o próprio IP externo nas portas publicadas pelo Docker (limitação conhecida). O tráfego loopback funciona normalmente, então `127.0.0.1:80` chega no Caddy via WSL2 mirrored networking. Celulares e outros PCs da rede usam o IP da LAN normalmente (o mDNS do Avahi funciona para eles).
+No WSL2 com `networkingMode=mirrored`, o host Windows **não consegue** acessar o próprio IP externo nas portas publicadas pelo Docker (limitação conhecida). O tráfego loopback funciona normalmente, então `127.0.0.1:80` chega no frontend (nginx) via WSL2 mirrored networking. Celulares e outros PCs da rede usam o IP da LAN normalmente (o mDNS do Avahi funciona para eles).
 
 **Atenção:** nunca use `Set-Content` em arquivos de sistema sem privilégio de admin — ele trunca o arquivo para 0 bytes antes de falhar com "access denied". Use sempre `Add-Content` (append) ou confirme que o shell está elevado.
 
@@ -439,8 +439,7 @@ No WSL2 com `networkingMode=mirrored`, o host Windows **não consegue** acessar 
 
 | Serviço | Porta | URL |
 |---------|-------|-----|
-| Frontend | 3001 (Docker) / 5173 (dev) | http://localhost:3001 |
-| Caddy | 80 | http://localhost:80 |
+| Frontend | 80/3001 (Docker) / 5173 (dev) | http://localhost |
 | Backend API | 8000 | http://localhost:8000 |
 | API Docs | 8000/docs | http://localhost:8000/docs |
 | PostgreSQL | 5432 | localhost:5432 |

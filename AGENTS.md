@@ -30,7 +30,7 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 **Docker**
 
 - `docker-compose up --build -d` — full stack
-- Frontend container exposes **3001**, backend 8000, Postgres 5432, qBittorrent 8082, Jackett 9117, FlareSolverr 8191
+- Frontend container exposes **80** (and 3001), backend 8000, Postgres 5432, qBittorrent 8082, Jackett 9117, FlareSolverr 8191
 
 ## Backend architecture
 
@@ -40,7 +40,7 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 - **Logging:** Loguru + structlog. Logs written to `backend/logs/app.log` with rotation.
 - **Models:** `download.py`, `settings.py`, `tmdb.py`, `torrent.py`, `discover.py` in `app/models/`.
 - **Routers:** `search`, `downloads`, `settings`, `logs`, `filesystem`, `discover`, `stream` in `app/routers/`.
-- **Services:** `PathResolver` (`app/services/path_resolver.py`) computes save paths from torrent metadata; `DownloadWorker` (`app/services/download_worker.py`) monitors qBittorrent progress in a background loop; `OrganizerService` (`app/services/organizer_service.py`) moves completed downloads to library folders; `DiscoverService` (`app/services/discover_service.py`) provides TMDB browse sections; `JellyfinService` (`app/services/jellyfin_service.py`) triggers library scans; `OMDBService` (`app/services/omdb_service.py`) fetches Rotten Tomatoes ratings; `PathConverter` (`app/services/path_converter.py`) converts WSL2↔Windows paths; `SettingsService` (`app/services/settings_service.py`) manages settings CRUD; `ConfigService` (`app/services/config_service.py`) provides `get_config()` with DB→.env priority chain; `StreamService` (`app/services/stream_service.py`) resolves playable files, decides direct-vs-transcode via ffprobe (cached by path+mtime), and `StreamSessionManager` (module singleton `stream_manager`) runs HLS transcode sessions — ffmpeg process + segments dir keyed by `(download_id, episode)`, touch-on-request with 60s idle sweep (background thread started in lifespan), episode switch kills the previous session, capacity 3 with 503.
+- **Services:** `PathResolver` (`app/services/path_resolver.py`) computes save paths from torrent metadata; `DownloadWorker` (`app/services/download_worker.py`) monitors qBittorrent progress in a background loop; `OrganizerService` (`app/services/organizer_service.py`) moves completed downloads to library folders; `DiscoverService` (`app/services/discover_service.py`) provides TMDB browse sections; `OMDBService` (`app/services/omdb_service.py`) fetches Rotten Tomatoes ratings; `PathConverter` (`app/services/path_converter.py`) converts Windows↔WSL paths; `ConfigService` (`app/services/config_service.py`) provides `get_config()` with DB→.env priority chain; `StreamService` (`app/services/stream_service.py`) resolves playable files, decides direct-vs-transcode via ffprobe (cached by path+mtime), and `StreamSessionManager` (module singleton `stream_manager`) runs HLS transcode sessions — ffmpeg process + segments dir keyed by `(download_id, episode)`, touch-on-request with 60s idle sweep (background thread started in lifespan), episode switch kills the previous session, capacity 3 with 503.
 - **Scrapers:** `JackettScraper` (`app/scrapers/jackett_scraper.py`) with `BaseScraper` abstract interface.
 - **Exceptions:** `ConfigurationError`, `StreamLimitError`, `StreamTranscodeError` in `app/exceptions.py`.
 - **WebSocket:** `/ws` endpoint in `app/main.py` broadcasts download updates.
@@ -91,8 +91,7 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 |---------|-------|-------|-------|
 | db | `postgres:15-alpine` | 5432 | PostgreSQL database |
 | backend | Custom build | 8000 | FastAPI app |
-| frontend | Custom build | 3001 | React + nginx |
-| caddy | `caddy:alpine` | 80 | Reverse proxy (plain HTTP) |
+| frontend | Custom build | 80, 3001 | React + nginx |
 | avahi | Custom build | — | mDNS for `jellyfin.local` (host network) |
 | qbittorrent | `lscr.io/linuxserver/qbittorrent` | 8082, 6881 | Torrent client (host port 8082) |
 | jackett | `lscr.io/linuxserver/jackett` | 9117 | Torrent indexer gateway |
@@ -121,8 +120,7 @@ Full-stack app (FastAPI + React) that automates media downloads for Jellyfin via
 - **DownloadWorker runs on startup:** The background worker starts automatically with the FastAPI app and cannot be disabled without code changes.
 - **OrganizerService moves files on completion:** Completed downloads are automatically organized into `MOVIES_PATH`, `SERIES_PATH`, or `ANIMES_PATH` based on media type. Ensure these paths are writable.
 - **ConfigError on missing settings:** If a required config key is missing from both DB and `.env`, the API returns HTTP 500 with `{"error": "configuration_error", "key": "...", "message": "..."}`.
-- **nginx.conf uses Docker service names:** The frontend nginx proxies to `http://backend:8000`, not `backend-host`.
-- **Caddy serves plain HTTP** on port 80 (auto-HTTPS disabled) and reverse-proxies to the frontend container.
+- **nginx.conf uses Docker service names:** The frontend nginx proxies to `http://backend:8000`, not `backend-host` and serves plain HTTP on port 80 (published on both 80 and 3001).
 - **Avahi mDNS** broadcasts `jellyfin.local` on the local network via host network mode — Debian-based container (Alpine avahi-daemon crashes).
 - **WSL2 mirrored mode is required** for Avahi mDNS to work. Configure `C:\Users\<user>\.wslconfig` with `[wsl2] networkingMode=mirrored firewall=false` and run `wsl --shutdown`. NAT mode (default) blocks multicast from crossing the WSL2 boundary.
 - **WSL2 mirrored mode self-to-self limitation:** the Windows host cannot reach its own external IP (e.g. `192.168.10.100`) on Docker-published ports from itself. LAN devices (phones, other PCs) work fine, but the host itself must use `127.0.0.1`. This is why the Windows `hosts` file must map `jellyfin.local` to `127.0.0.1` (not the LAN IP) for desktop access.

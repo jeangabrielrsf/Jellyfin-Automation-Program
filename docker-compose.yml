@@ -55,21 +55,10 @@ services:
     init: true
     stop_grace_period: 10s
     ports:
+      - "80:80"
       - "3001:80"
     depends_on:
       - backend
-
-  caddy:
-    image: caddy:alpine
-    restart: always
-    dns:
-      - 127.0.0.11
-    ports:
-      - "80:80"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-    depends_on:
-      - frontend
 
   avahi:
     build: ./docker/avahi

@@ -38,16 +38,9 @@ O **Jellyfin Automation** permite:
 ┌─────────────────────────────────────────────────────────────┐
 │                        Frontend                              │
 │              (React + Vite + TailwindCSS)                   │
-│                     Porta: 3001                              │
+│                     Porta: 80/3001                           │
 └──────────────────────┬──────────────────────────────────────┘
                        │ HTTP / WebSocket
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│                        Caddy                                 │
-│                  (Reverse Proxy)                             │
-│                     Porta: 80                                │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                        Backend                               │
@@ -69,7 +62,7 @@ O **Jellyfin Automation** permite:
                                                   └──────────────┘
 ```
 
-**Nota:** qBittorrent, Jackett e FlareSolverr rodam como containers Docker. O Jellyfin permanece no Windows (serviço externo). Caddy atua como reverse proxy na porta 80. Avahi mDNS resolve `jellyfin.local` na rede local.
+**Nota:** qBittorrent, Jackett e FlareSolverr rodam como containers Docker. O Jellyfin permanece no Windows (serviço externo). O frontend nginx serve a interface na porta 80. Avahi mDNS resolve `jellyfin.local` na rede local.
 
 ---
 
@@ -134,8 +127,7 @@ Serviços expostos:
 
 | Serviço | URL | Descrição |
 |---------|-----|-----------|
-| Frontend | `http://localhost:3001` | Interface web |
-| Caddy | `http://localhost:80` | Reverse proxy |
+| Frontend | `http://localhost` | Interface web |
 | Backend API | `http://localhost:8000` | API REST + Swagger |
 | qBittorrent | `http://localhost:8082` | Gerenciador de torrents |
 | Jackett | `http://localhost:9117` | Indexador de torrents |
