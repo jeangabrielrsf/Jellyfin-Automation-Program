@@ -103,8 +103,8 @@ class JackettClient:
     async def find_fresh_link(self, torrent_name: str) -> Optional[Dict]:
         """Find a fresh download link by searching Jackett again.
         
-        Uses three-tier matching strategy: exact → word → substring.
-        Prioritizes MagnetUri (doesn't expire) over Link (expires quickly).
+        Matches by exact, word-subset then substring title, preferring
+        MagnetUri (doesn't expire) over Link (expires quickly).
         
         Args:
             torrent_name: Name of the torrent to find
@@ -129,93 +129,56 @@ class JackettClient:
             data = response.json()
             
             results = data.get("Results", [])
+            normalized_name = self._normalize(torrent_name)
+            name_words = set(normalized_name.split())
             
-            def normalize(text: str) -> str:
-                """Normalize text for comparison: lowercase and replace dots with spaces."""
-                return text.lower().replace('.', ' ').replace('-', ' ').replace('_', ' ')
+            def rank(title: str) -> Optional[int]:
+                """0 exact, 1 word-subset, 2 substring; None when no match."""
+                normalized_title = self._normalize(title)
+                if normalized_title == normalized_name:
+                    return 0
+                if name_words.issubset(set(normalized_title.split())):
+                    return 1
+                if normalized_name in normalized_title or normalized_title in normalized_name:
+                    return 2
+                return None
             
-            normalized_torrent_name = normalize(torrent_name)
-            torrent_words = set(normalized_torrent_name.split())
-            
-            logger.info(
-                "Looking for torrent match",
-                torrent_name=torrent_name,
-                normalized=normalized_torrent_name,
-                words=torrent_words,
-                total_results=len(results)
-            )
-            
-            # Pass 1: Exact match with MagnetUri
+            best: Optional[tuple] = None
             for item in results:
-                title = item.get("Title", "")
-                normalized_title = normalize(title)
-                if normalized_title == normalized_torrent_name:
-                    magnet_uri = item.get("MagnetUri")
-                    if magnet_uri:
-                        logger.info("Found fresh magnet link for torrent (exact match)", torrent_name=torrent_name, matched_title=title)
-                        return {"link": magnet_uri, "tracker_id": None}
+                title_rank = rank(item.get("Title", ""))
+                if title_rank is None:
+                    continue
+                magnet = item.get("MagnetUri")
+                link = item.get("Link")
+                if not magnet and not link:
+                    continue
+                # Magnet always beats an expiring Link; then best match rank.
+                candidate = (0 if magnet else 1, title_rank, item)
+                if best is None or candidate[:2] < best[:2]:
+                    best = candidate
             
-            # Pass 1: Word match with MagnetUri
-            for item in results:
-                title = item.get("Title", "")
-                normalized_title = normalize(title)
-                title_words = set(normalized_title.split())
-                if torrent_words.issubset(title_words):
-                    magnet_uri = item.get("MagnetUri")
-                    if magnet_uri:
-                        logger.info("Found fresh magnet link for torrent (word match)", torrent_name=torrent_name, matched_title=title)
-                        return {"link": magnet_uri, "tracker_id": None}
+            if best is None:
+                logger.warning("Could not find fresh link for torrent", torrent_name=torrent_name, results_count=len(results))
+                return None
             
-            # Pass 1: Substring match with MagnetUri
-            for item in results:
-                title = item.get("Title", "")
-                normalized_title = normalize(title)
-                if normalized_torrent_name in normalized_title or normalized_title in normalized_torrent_name:
-                    magnet_uri = item.get("MagnetUri")
-                    if magnet_uri:
-                        logger.info("Found fresh magnet link for torrent (substring match)", torrent_name=torrent_name, matched_title=title)
-                        return {"link": magnet_uri, "tracker_id": None}
+            item = best[2]
+            matched_title = item.get("Title", "")
+            if item.get("MagnetUri"):
+                logger.info("Found fresh magnet link for torrent", torrent_name=torrent_name, matched_title=matched_title)
+                return {"link": item["MagnetUri"], "tracker_id": None}
             
-            # Pass 2: Exact match with Link (fallback)
-            for item in results:
-                title = item.get("Title", "")
-                normalized_title = normalize(title)
-                if normalized_title == normalized_torrent_name:
-                    fresh_link = item.get("Link")
-                    if fresh_link:
-                        tracker_id = item.get("TrackerId") or item.get("Tracker")
-                        logger.info("Found fresh download link for torrent (exact match)", torrent_name=torrent_name, matched_title=title)
-                        return {"link": fresh_link, "tracker_id": tracker_id}
-            
-            # Pass 2: Word match with Link (fallback)
-            for item in results:
-                title = item.get("Title", "")
-                normalized_title = normalize(title)
-                title_words = set(normalized_title.split())
-                if torrent_words.issubset(title_words):
-                    fresh_link = item.get("Link")
-                    if fresh_link:
-                        tracker_id = item.get("TrackerId") or item.get("Tracker")
-                        logger.info("Found fresh download link for torrent (word match)", torrent_name=torrent_name, matched_title=title)
-                        return {"link": fresh_link, "tracker_id": tracker_id}
-            
-            # Pass 2: Substring match with Link (fallback)
-            for item in results:
-                title = item.get("Title", "")
-                normalized_title = normalize(title)
-                if normalized_torrent_name in normalized_title or normalized_title in normalized_torrent_name:
-                    fresh_link = item.get("Link")
-                    if fresh_link:
-                        tracker_id = item.get("TrackerId") or item.get("Tracker")
-                        logger.info("Found fresh download link for torrent (substring match)", torrent_name=torrent_name, matched_title=title)
-                        return {"link": fresh_link, "tracker_id": tracker_id}
-            
-            logger.warning("Could not find fresh link for torrent", torrent_name=torrent_name, results_count=len(results))
-            return None
+            tracker_id = item.get("TrackerId") or item.get("Tracker")
+            logger.info("Found fresh download link for torrent", torrent_name=torrent_name, matched_title=matched_title)
+            return {"link": item["Link"], "tracker_id": tracker_id}
             
         except Exception as e:
             logger.error("Failed to get fresh Jackett link", error=str(e))
             return None
+    
+    @staticmethod
+    def _normalize(text: str) -> str:
+        """Normalize text for comparison: lowercase, dots/dashes/underscores to spaces."""
+        return text.lower().replace('.', ' ').replace('-', ' ').replace('_', ' ')
     
     async def close(self):
         """Close the HTTP client."""
