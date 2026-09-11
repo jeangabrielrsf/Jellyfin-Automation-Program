@@ -8,13 +8,11 @@ def test_setup_logging_creates_logs_dir(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     logs_dir = tmp_path / "logs"
 
-    with patch('app.logging_config.logger') as mock_logger, \
-         patch('app.logging_config.structlog') as mock_structlog:
+    with patch('app.logging_config.logger') as mock_logger:
         setup_logging()
 
         mock_logger.remove.assert_called_once()
         assert mock_logger.add.call_count == 2  # console + file
-        mock_structlog.configure.assert_called_once()
         assert logs_dir.exists()
 
 def test_get_logger_returns_bound_logger():

@@ -2,7 +2,6 @@
 import sys
 from pathlib import Path
 from loguru import logger
-import structlog
 from app.config import get_settings
 
 CONSOLE_FORMAT = (
@@ -40,25 +39,6 @@ def setup_logging() -> "loguru.Logger":
         retention=5,
         compression="zip",
         enqueue=True,
-    )
-    
-    # Configure structlog
-    structlog.configure(
-        processors=[
-            structlog.stdlib.filter_by_level,
-            structlog.stdlib.add_logger_name,
-            structlog.stdlib.add_log_level,
-            structlog.stdlib.PositionalArgumentsFormatter(),
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.StackInfoRenderer(),
-            structlog.processors.format_exc_info,
-            structlog.processors.UnicodeDecoder(),
-            structlog.processors.JSONRenderer()
-        ],
-        context_class=dict,
-        logger_factory=structlog.stdlib.LoggerFactory(),
-        wrapper_class=structlog.stdlib.BoundLogger,
-        cache_logger_on_first_use=True,
     )
     
     logger.info("Logging configured", level=settings.log_level)
