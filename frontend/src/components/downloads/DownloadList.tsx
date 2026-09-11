@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pause, Play, Trash2, Info } from 'lucide-react';
+import { Pause, Trash2, Info } from 'lucide-react';
 import type { Download as DownloadType } from '@/types';
 import { downloadStatusConfig } from './downloadStatusConfig';
 
@@ -8,7 +8,6 @@ interface DownloadListProps {
   onSelectDownload: (download: DownloadType) => void;
   onRequestCancel: (download: DownloadType) => void;
   onPause: (id: number) => void;
-  onResume: (id: number) => void;
 }
 
 export const DownloadList: React.FC<DownloadListProps> = ({
@@ -16,7 +15,6 @@ export const DownloadList: React.FC<DownloadListProps> = ({
   onSelectDownload,
   onRequestCancel,
   onPause,
-  onResume,
 }) => {
   return (
     <>
@@ -67,17 +65,6 @@ export const DownloadList: React.FC<DownloadListProps> = ({
                     title="Pausar"
                   >
                     <Pause className="w-4 h-4" />
-                  </button>
-                )}
-                {download.status === 'paused' && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onResume(download.id); }}
-                    className="w-9 h-9 rounded-lg glass flex items-center justify-center
-                             hover:bg-emerald-400/10 hover:text-emerald-400
-                             active:scale-95 transition-all duration-200"
-                    title="Retomar"
-                  >
-                    <Play className="w-4 h-4" />
                   </button>
                 )}
                 <button

@@ -205,14 +205,6 @@ class QBittorrentService:
             logger.error("Failed to get torrents", error=str(e))
             return []
     
-    async def get_torrent(self, torrent_hash: str) -> Optional[Dict]:
-        """Get specific torrent by hash."""
-        torrents = await self.get_torrents()
-        for torrent in torrents:
-            if torrent.get("hash") == torrent_hash:
-                return torrent
-        return None
-    
     async def pause_torrent(self, torrent_hash: str) -> bool:
         """Pause a torrent."""
         if not await self._authenticate():

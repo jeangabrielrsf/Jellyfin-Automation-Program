@@ -9,7 +9,7 @@ from httpx import ASGITransport, AsyncClient
 from app.main import app
 from app.database import get_db
 from app.models.settings import Setting
-from app.models.discover import SectionCatalog, DiscoverSection, SectionInfo, Genre, DiscoverParams
+from app.models.discover import SectionCatalog, DiscoverSection, SectionInfo, Genre
 from app.services.discover_service import DiscoverService, SECTION_DEFS
 
 SKIP_INTEGRATION = not os.environ.get("TMDB_API_KEY")
@@ -121,9 +121,6 @@ class TestBannerRotation:
         service = DiscoverService.__new__(DiscoverService)
         service.api_key = "test"
         service.client = _MockClient()
-        service._section_cache = {}
-        service._genre_cache = None
-        service._banner_cache = None
 
         import asyncio
         banner = asyncio.run(service._fetch_banner())
@@ -142,9 +139,6 @@ class TestBannerRotation:
         service = DiscoverService.__new__(DiscoverService)
         service.api_key = "test"
         service.client = EmptyClient()
-        service._section_cache = {}
-        service._genre_cache = None
-        service._banner_cache = None
 
         import asyncio
         banner = asyncio.run(service._fetch_banner())
@@ -176,9 +170,6 @@ class TestGetSectionsCatalog:
         service = DiscoverService.__new__(DiscoverService)
         service.api_key = "test"
         service.client = _MockClient()
-        service._section_cache = {}
-        service._genre_cache = None
-        service._banner_cache = None
         return service
 
     @pytest.mark.anyio
@@ -210,9 +201,6 @@ class TestGetSection:
         service = DiscoverService.__new__(DiscoverService)
         service.api_key = "test"
         service.client = _MockClient()
-        service._section_cache = {}
-        service._genre_cache = None
-        service._banner_cache = None
 
         section = await service.get_section("trending")
         assert section.id == "trending"
@@ -225,9 +213,6 @@ class TestGetSection:
         service = DiscoverService.__new__(DiscoverService)
         service.api_key = "test"
         service.client = _MockClient()
-        service._section_cache = {}
-        service._genre_cache = None
-        service._banner_cache = None
 
         section = await service.get_section("recently-added")
         assert section.id == "recently-added"
@@ -239,9 +224,6 @@ class TestGetSection:
         service = DiscoverService.__new__(DiscoverService)
         service.api_key = "test"
         service.client = _MockClient()
-        service._section_cache = {}
-        service._genre_cache = None
-        service._banner_cache = None
 
         section = await service.get_section("streaming-hot")
         assert section.id == "streaming-hot"
@@ -253,9 +235,6 @@ class TestGetSection:
         service = DiscoverService.__new__(DiscoverService)
         service.api_key = "test"
         service.client = _MockClient()
-        service._section_cache = {}
-        service._genre_cache = None
-        service._banner_cache = None
 
         section = await service.get_section("seasonal-anime")
         assert section.id == "seasonal-anime"
@@ -268,9 +247,6 @@ class TestGetSection:
         service = DiscoverService.__new__(DiscoverService)
         service.api_key = "test"
         service.client = _MockClient()
-        service._section_cache = {}
-        service._genre_cache = None
-        service._banner_cache = None
 
         section = await service.get_section("classics")
         assert section.id == "classics"
@@ -282,26 +258,10 @@ class TestGetSection:
         service = DiscoverService.__new__(DiscoverService)
         service.api_key = "test"
         service.client = _MockClient()
-        service._section_cache = {}
-        service._genre_cache = None
-        service._banner_cache = None
 
         section = await service.get_section("nonexistent")
         assert section.title == ""
         assert section.results == []
-
-    @pytest.mark.anyio
-    async def test_section_caching(self, mock_discover_http):
-        service = DiscoverService.__new__(DiscoverService)
-        service.api_key = "test"
-        service.client = _MockClient()
-        service._section_cache = {}
-        service._genre_cache = None
-        service._banner_cache = None
-
-        section1 = await service.get_section("trending")
-        section2 = await service.get_section("trending")
-        assert section1 is section2
 
 
 class TestTMDBParams:
@@ -320,9 +280,6 @@ class TestTMDBParams:
         service = DiscoverService.__new__(DiscoverService)
         service.api_key = "test"
         service.client = TrackingClient()
-        service._section_cache = {}
-        service._genre_cache = None
-        service._banner_cache = None
 
         await service.get_section("recently-added")
 
@@ -348,9 +305,6 @@ class TestTMDBParams:
         service = DiscoverService.__new__(DiscoverService)
         service.api_key = "test"
         service.client = TrackingClient()
-        service._section_cache = {}
-        service._genre_cache = None
-        service._banner_cache = None
 
         await service.get_section("streaming-hot")
 
@@ -376,9 +330,6 @@ class TestTMDBParams:
         service = DiscoverService.__new__(DiscoverService)
         service.api_key = "test"
         service.client = TrackingClient()
-        service._section_cache = {}
-        service._genre_cache = None
-        service._banner_cache = None
 
         await service.get_section("seasonal-anime")
 
@@ -403,9 +354,6 @@ class TestTMDBParams:
         service = DiscoverService.__new__(DiscoverService)
         service.api_key = "test"
         service.client = TrackingClient()
-        service._section_cache = {}
-        service._genre_cache = None
-        service._banner_cache = None
 
         await service.get_section("classics")
 
@@ -430,9 +378,6 @@ class TestTMDBParams:
         service = DiscoverService.__new__(DiscoverService)
         service.api_key = "test"
         service.client = TrackingClient()
-        service._section_cache = {}
-        service._genre_cache = None
-        service._banner_cache = None
 
         await service.get_section("trending")
 
@@ -531,25 +476,6 @@ async def test_api_each_section_returns_data(mock_discover_http, discover_client
             data = response.json()
             assert data["id"] == section_id
             assert len(data["results"]) > 0
-
-
-class TestDiscoverParams:
-    def test_defaults(self):
-        p = DiscoverParams()
-        assert p.genre_id is None
-        assert p.media_type is None
-        assert p.sort_by == "popularity.desc"
-
-    def test_with_filters(self):
-        p = DiscoverParams(genre_id=28, media_type="movie", sort_by="vote_average.desc")
-        assert p.genre_id == 28
-        assert p.media_type == "movie"
-        assert p.sort_by == "vote_average.desc"
-
-    def test_with_watch_provider(self):
-        p = DiscoverParams(watch_provider_id=8)
-        assert p.watch_provider_id == 8
-        assert p.genre_id is None
 
 
 class TestSectionInfo:

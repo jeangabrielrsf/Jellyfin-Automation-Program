@@ -10,7 +10,6 @@ import { DownloadList } from "./DownloadList";
 interface DownloadMonitorProps {
     downloads: DownloadType[];
     onPause: (id: number) => void;
-    onResume: (id: number) => void;
     onCancel: (id: number, deleteFiles: boolean) => void;
     onClear: (downloads: { id: number; delete_files: boolean }[]) => void;
 }
@@ -18,7 +17,6 @@ interface DownloadMonitorProps {
 export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
     downloads,
     onPause,
-    onResume,
     onCancel,
     onClear,
 }) => {
@@ -72,7 +70,6 @@ export const DownloadMonitor: React.FC<DownloadMonitorProps> = ({
                 onSelectDownload={setSelectedDownload}
                 onRequestCancel={setDownloadToCancel}
                 onPause={onPause}
-                onResume={onResume}
             />
 
             {downloadToCancel && (

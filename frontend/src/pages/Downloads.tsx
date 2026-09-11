@@ -18,11 +18,6 @@ const DownloadsPage: React.FC = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['downloads'] }),
   });
 
-  const resumeMutation = useMutation({
-    mutationFn: (id: number) => downloadAPI.resumeDownload(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['downloads'] }),
-  });
-
   const cancelMutation = useMutation({
     mutationFn: ({ id, deleteFiles }: { id: number; deleteFiles: boolean }) => downloadAPI.cancelDownload(id, deleteFiles),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['downloads'] }),
@@ -44,7 +39,6 @@ const DownloadsPage: React.FC = () => {
   const handleClear = (downloads: { id: number; delete_files: boolean }[]) => clearMutation.mutate(downloads);
 
   const handlePause = (id: number) => pauseMutation.mutate(id);
-  const handleResume = (id: number) => resumeMutation.mutate(id);
   const handleCancel = (id: number, deleteFiles: boolean) => {
     cancelMutation.mutate({ id, deleteFiles });
   };
@@ -82,7 +76,6 @@ const DownloadsPage: React.FC = () => {
       <DownloadMonitor
         downloads={downloads?.data || []}
         onPause={handlePause}
-        onResume={handleResume}
         onCancel={handleCancel}
         onClear={handleClear}
       />

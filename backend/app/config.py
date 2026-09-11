@@ -29,10 +29,7 @@ class Settings(BaseSettings):
     jellyfin_api_key: str = Field(default="")
     
     # App
-    app_host: str = Field(default="0.0.0.0")
-    app_port: int = Field(default=8000)
     log_level: str = Field(default="INFO")
-    secret_key: str = Field(default="dev-secret-key")
     
     # Library paths
     movies_path: str = Field(default="D:\\Filmes")
@@ -42,6 +39,10 @@ class Settings(BaseSettings):
     # Default preferences
     default_quality: str = Field(default="1080p")
     default_language: str = Field(default="legendado")
+
+    # Streaming (playback com transcode on-demand)
+    stream_max_sessions: int = Field(default=3)
+    stream_session_timeout: int = Field(default=60)
     
     model_config = ConfigDict(
         env_file=".env",

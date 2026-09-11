@@ -183,7 +183,7 @@ async def test_get_tv_detail_http_error_raises(tmdb_service):
 
 
 @pytest.mark.asyncio
-async def test_get_similar_movies_returns_results(tmdb_service):
+async def test_get_similar_returns_results(tmdb_service):
     mock_response = MagicMock()
     mock_response.json.return_value = {
         "results": [
@@ -209,54 +209,12 @@ async def test_get_similar_movies_returns_results(tmdb_service):
     }
     mock_response.raise_for_status = MagicMock()
     with patch.object(tmdb_service.client, "get", AsyncMock(return_value=mock_response)):
-        result = await tmdb_service.get_similar_movies(1)
+        result = await tmdb_service.get_similar("movie", 1)
     assert [r["id"] for r in result] == [11, 12]
 
 
 @pytest.mark.asyncio
-async def test_get_similar_tv_returns_results(tmdb_service):
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "results": [
-            {
-                "id": 21,
-                "name": "TV A",
-                "overview": "...",
-                "vote_average": 8.0,
-                "media_type": "tv",
-                "genre_ids": [],
-            }
-        ]
-    }
-    mock_response.raise_for_status = MagicMock()
-    with patch.object(tmdb_service.client, "get", AsyncMock(return_value=mock_response)):
-        result = await tmdb_service.get_similar_tv(1)
-    assert [r["id"] for r in result] == [21]
-
-
-@pytest.mark.asyncio
-async def test_get_recommendations_movies_returns_results(tmdb_service):
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "results": [
-            {
-                "id": 31,
-                "title": "Rec A",
-                "overview": "...",
-                "vote_average": 7.5,
-                "media_type": "movie",
-                "genre_ids": [],
-            }
-        ]
-    }
-    mock_response.raise_for_status = MagicMock()
-    with patch.object(tmdb_service.client, "get", AsyncMock(return_value=mock_response)):
-        result = await tmdb_service.get_recommendations_movies(1)
-    assert [r["id"] for r in result] == [31]
-
-
-@pytest.mark.asyncio
-async def test_get_recommendations_tv_returns_results(tmdb_service):
+async def test_get_recommendations_returns_results(tmdb_service):
     mock_response = MagicMock()
     mock_response.json.return_value = {
         "results": [
@@ -272,5 +230,5 @@ async def test_get_recommendations_tv_returns_results(tmdb_service):
     }
     mock_response.raise_for_status = MagicMock()
     with patch.object(tmdb_service.client, "get", AsyncMock(return_value=mock_response)):
-        result = await tmdb_service.get_recommendations_tv(1)
+        result = await tmdb_service.get_recommendations("tv", 1)
     assert [r["id"] for r in result] == [41]

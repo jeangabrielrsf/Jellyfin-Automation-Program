@@ -1,4 +1,0 @@
-http://:80 {
-    reverse_proxy /ws backend:8000
-    reverse_proxy frontend:80
-}

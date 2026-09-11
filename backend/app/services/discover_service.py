@@ -1,8 +1,7 @@
-"""Discover service — TMDB section data with in-memory TTL cache."""
+"""Discover service — TMDB section data."""
 import asyncio
-import time
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict
 
 import httpx
 from sqlalchemy.orm import Session
@@ -43,17 +42,11 @@ STREAMING_PROVIDER_IDS = "|".join(str(p["id"]) for p in STREAMING_PROVIDERS)
 
 class DiscoverService:
     BASE_URL = "https://api.themoviedb.org/3"
-    SECTION_TTL = 300
-    GENRE_TTL = 3600
-    BANNER_TTL = 300
 
     def __init__(self, db: Session | None = None):
         self.db = db
         self.api_key = get_config("tmdb_api_key", db, required=True)
         self.client = httpx.AsyncClient(timeout=10.0)
-        self._section_cache: Dict[str, Tuple[float, DiscoverSection]] = {}
-        self._genre_cache: Optional[Tuple[float, List[Genre]]] = None
-        self._banner_cache: Optional[Tuple[float, Optional[TMDBSearchResult]]] = None
 
     async def close(self):
         await self.client.aclose()
@@ -63,11 +56,6 @@ class DiscoverService:
         return (now.timetuple().tm_yday - 1) % 5
 
     async def _fetch_banner(self) -> Optional[TMDBSearchResult]:
-        if self._banner_cache:
-            ts, data = self._banner_cache
-            if time.time() - ts < self.BANNER_TTL:
-                return data
-
         try:
             common = {"api_key": self.api_key, "language": "pt-BR", "include_adult": "false"}
             response = await self.client.get(
@@ -78,7 +66,6 @@ class DiscoverService:
             raw = data.get("results", [])[:5]
 
             if not raw:
-                self._banner_cache = (time.time(), None)
                 return None
 
             index = self._pick_banner_index(datetime.now())
@@ -139,29 +126,17 @@ class DiscoverService:
                 display_title=title,
                 year=year,
             )
-            self._banner_cache = (time.time(), banner)
             return banner
         except Exception:
             logger.exception("Failed to fetch banner")
-            self._banner_cache = (time.time(), None)
             return None
 
-    async def _ensure_banner(self) -> Optional[BannerMedia]:
-        return await self._fetch_banner()
-
     async def get_sections_catalog(self) -> SectionCatalog:
-        banner = await self._ensure_banner()
+        banner = await self._fetch_banner()
         sections = list(SECTION_DEFS)
         return SectionCatalog(banner=banner, sections=sections)
 
     async def get_section(self, section_id: str) -> DiscoverSection:
-        key = section_id
-        cached = self._section_cache.get(key)
-        if cached:
-            ts, data = cached
-            if time.time() - ts < self.SECTION_TTL:
-                return data
-
         section_def = next((s for s in SECTION_DEFS if s.id == section_id), None)
         if not section_def:
             return DiscoverSection(id=section_id, title="", media_type="", results=[], total_results=0)
@@ -179,7 +154,6 @@ class DiscoverService:
             results=results,
             total_results=len(results),
         )
-        self._section_cache[key] = (time.time(), section)
         return section
 
     async def _fetch_tmdb(self, section_id: str, section_def: SectionInfo) -> List[TMDBSearchResult]:
@@ -254,11 +228,6 @@ class DiscoverService:
         return results
 
     async def get_genres(self) -> List[Genre]:
-        if self._genre_cache:
-            ts, data = self._genre_cache
-            if time.time() - ts < self.GENRE_TTL:
-                return data
-
         common = {"api_key": self.api_key, "language": "pt-BR", "include_adult": "false"}
         try:
             movie_resp = await self.client.get(f"{self.BASE_URL}/genre/movie/list", params=common)
@@ -276,7 +245,6 @@ class DiscoverService:
                     seen[gid] = g["name"]
 
             genres = [Genre(id=gid, name=name) for gid, name in sorted(seen.items())]
-            self._genre_cache = (time.time(), genres)
             return genres
         except Exception:
             logger.exception("Failed to fetch genres")

@@ -30,7 +30,7 @@ describe('CancelConfirmationDialog', () => {
     render(<CancelConfirmationDialog {...defaultProps} isOpen={true} />);
     expect(screen.getByRole('heading', { name: 'Cancelar download' })).toBeInTheDocument();
     expect(screen.getByText(/Tem certeza que deseja cancelar o download de/)).toBeInTheDocument();
-    expect(screen.getByText('Test Movie')).toBeInTheDocument();
+    expect(screen.getByText(/Test Movie/)).toBeInTheDocument();
   });
 
   it('calls onCancel with deleteFiles=false when confirm clicked without checkbox', () => {
@@ -45,7 +45,7 @@ describe('CancelConfirmationDialog', () => {
   it('calls onCancel with deleteFiles=true when checkbox is checked', () => {
     render(<CancelConfirmationDialog {...defaultProps} isOpen={true} />);
     
-    const checkbox = screen.getByLabelText('Deletar arquivos baixados do disco');
+    const checkbox = screen.getByLabelText('Deletar arquivos parciais do disco');
     fireEvent.click(checkbox);
     
     const confirmButton = screen.getByRole('button', { name: 'Cancelar download' });
@@ -57,14 +57,14 @@ describe('CancelConfirmationDialog', () => {
   it('resets deleteFiles state when dialog closes', () => {
     const { rerender } = render(<CancelConfirmationDialog {...defaultProps} isOpen={true} />);
     
-    const checkbox = screen.getByLabelText('Deletar arquivos baixados do disco');
+    const checkbox = screen.getByLabelText('Deletar arquivos parciais do disco');
     fireEvent.click(checkbox);
     expect(checkbox).toBeChecked();
     
     rerender(<CancelConfirmationDialog {...defaultProps} isOpen={false} />);
     
     rerender(<CancelConfirmationDialog {...defaultProps} isOpen={true} />);
-    const newCheckbox = screen.getByLabelText('Deletar arquivos baixados do disco');
+    const newCheckbox = screen.getByLabelText('Deletar arquivos parciais do disco');
     expect(newCheckbox).not.toBeChecked();
   });
 

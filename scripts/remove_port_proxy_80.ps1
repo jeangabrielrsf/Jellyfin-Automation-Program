@@ -46,5 +46,5 @@ if ($port80) {
 Write-Host "`n=== Próximos passos ===" -ForegroundColor Cyan
 Write-Host "No WSL2, execute:" -ForegroundColor White
 Write-Host "  cd /home/jeanfrusca/Projetos/jellyfin_automation" -ForegroundColor Yellow
-Write-Host "  docker compose down caddy" -ForegroundColor Yellow
-Write-Host "  docker compose up -d caddy" -ForegroundColor Yellow
+Write-Host "  docker compose down frontend" -ForegroundColor Yellow
+Write-Host "  docker compose up -d frontend" -ForegroundColor Yellow

@@ -6,6 +6,7 @@ import type {
   MessageResponse, ClearDownloadsResponse, SettingsResponse, SettingUpdateResponse,
   RootResponse, DirsResponse, DiskSpaceResponse, LogsResponse,
   SectionCatalog, DiscoverSection, Genre, StreamingProvider,
+  PlaybackResponse,
 } from '@/types';
 
 export type { DiskSpaceResponse };
@@ -76,8 +77,8 @@ export const searchAPI = {
 };
 
 export const downloadAPI = {
-  listDownloads: (status?: string) =>
-    api.get<Download[]>('/downloads/', { params: { status } }),
+  listDownloads: (params?: { status?: string; tmdb_id?: number }) =>
+    api.get<Download[]>('/downloads/', { params }),
   
   createDownload: (data: {
     tmdb_id: number;
@@ -105,14 +106,17 @@ export const downloadAPI = {
   pauseDownload: (id: number) =>
     api.post<MessageResponse>(`/downloads/${id}/pause`),
 
-  resumeDownload: (id: number) =>
-    api.post<MessageResponse>(`/downloads/${id}/resume`),
-
   clearDownloads: (downloads: { id: number; delete_files: boolean }[]) =>
     api.delete<ClearDownloadsResponse>('/downloads/', { data: { downloads } }),
 
   getClearableDownloads: () =>
     api.get<Download[]>('/downloads/clearable'),
+
+  getDownload: (id: number) =>
+    api.get<Download>(`/downloads/${id}`),
+
+  getPlayback: (id: number) =>
+    api.get<PlaybackResponse>(`/downloads/${id}/playback`),
 };
 
 export const settingsAPI = {

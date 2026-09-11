@@ -126,46 +126,17 @@ class TMDBService:
         response.raise_for_status()
         return response.json()
 
-    async def get_similar_movies(self, movie_id: int) -> list[dict]:
-        """Fetch movies similar to the given movie id."""
-        logger.info("Fetching similar movies", movie_id=movie_id)
-        url = f"{self.BASE_URL}/movie/{movie_id}/similar"
-        params = {
-            "api_key": self.api_key,
-            "language": "pt-BR",
-        }
-        response = await self.client.get(url, params=params)
-        response.raise_for_status()
-        return response.json().get("results", [])
+    async def get_similar(self, tmdb_type: str, tmdb_id: int) -> list[dict]:
+        """Fetch TMDB similar titles for a movie or tv id."""
+        return await self._fetch_list(tmdb_type, tmdb_id, "similar")
 
-    async def get_similar_tv(self, tv_id: int) -> list[dict]:
-        """Fetch TV shows similar to the given tv id."""
-        logger.info("Fetching similar TV", tv_id=tv_id)
-        url = f"{self.BASE_URL}/tv/{tv_id}/similar"
-        params = {
-            "api_key": self.api_key,
-            "language": "pt-BR",
-        }
-        response = await self.client.get(url, params=params)
-        response.raise_for_status()
-        return response.json().get("results", [])
+    async def get_recommendations(self, tmdb_type: str, tmdb_id: int) -> list[dict]:
+        """Fetch TMDB-curated recommendations for a movie or tv id."""
+        return await self._fetch_list(tmdb_type, tmdb_id, "recommendations")
 
-    async def get_recommendations_movies(self, movie_id: int) -> list[dict]:
-        """Fetch TMDB-curated movie recommendations for the given movie id."""
-        logger.info("Fetching movie recommendations", movie_id=movie_id)
-        url = f"{self.BASE_URL}/movie/{movie_id}/recommendations"
-        params = {
-            "api_key": self.api_key,
-            "language": "pt-BR",
-        }
-        response = await self.client.get(url, params=params)
-        response.raise_for_status()
-        return response.json().get("results", [])
-
-    async def get_recommendations_tv(self, tv_id: int) -> list[dict]:
-        """Fetch TMDB-curated TV recommendations for the given tv id."""
-        logger.info("Fetching TV recommendations", tv_id=tv_id)
-        url = f"{self.BASE_URL}/tv/{tv_id}/recommendations"
+    async def _fetch_list(self, tmdb_type: str, tmdb_id: int, kind: str) -> list[dict]:
+        logger.info("Fetching TMDB list", tmdb_type=tmdb_type, tmdb_id=tmdb_id, kind=kind)
+        url = f"{self.BASE_URL}/{tmdb_type}/{tmdb_id}/{kind}"
         params = {
             "api_key": self.api_key,
             "language": "pt-BR",

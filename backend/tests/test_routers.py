@@ -301,6 +301,54 @@ class TestDownloadsRouter:
         assert response.status_code == 200
         assert response.json() == []
 
+    def test_list_downloads_filter_by_tmdb_id(self, client, db_session):
+        """tmdb_id filter returns only downloads for that media."""
+        first = Download(
+            tmdb_id=100,
+            title="First Movie",
+            type=ContentType.MOVIE,
+            torrent_name="First",
+            status=DownloadStatus.ORGANIZED,
+        )
+        second = Download(
+            tmdb_id=100,
+            title="Second Movie",
+            type=ContentType.MOVIE,
+            torrent_name="Second",
+            status=DownloadStatus.COMPLETED,
+        )
+        other = Download(
+            tmdb_id=200,
+            title="Other Movie",
+            type=ContentType.MOVIE,
+            torrent_name="Other",
+            status=DownloadStatus.ORGANIZED,
+        )
+        db_session.add_all([first, second, other])
+        db_session.commit()
+
+        response = client.get("/api/downloads/?tmdb_id=100")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+        assert {d["id"] for d in data} == {first.id, second.id}
+
+    def test_list_downloads_tmdb_id_filter_excludes_cleared(self, client, db_session):
+        """tmdb_id filter keeps the default CLEARED exclusion."""
+        cleared = Download(
+            tmdb_id=100,
+            title="Cleared Movie",
+            type=ContentType.MOVIE,
+            torrent_name="Cleared",
+            status=DownloadStatus.CLEARED,
+        )
+        db_session.add(cleared)
+        db_session.commit()
+
+        response = client.get("/api/downloads/?tmdb_id=100")
+        assert response.status_code == 200
+        assert response.json() == []
+
     def test_create_download(self, client, db_session):
         """Test creating a download."""
         payload = {
@@ -429,8 +477,8 @@ class TestDownloadsRouter:
         response = client.get("/api/downloads/9999")
         assert response.status_code == 404
 
-    def test_clear_all_downloads(self, client, db_session):
-        """Test clearing all completed/failed downloads, skipping active."""
+    def test_clear_selected_downloads(self, client, db_session):
+        """Clearing selected downloads removes finished ones and cancels active ones."""
         # Add a completed download
         completed = Download(
             tmdb_id=1,
@@ -449,7 +497,7 @@ class TestDownloadsRouter:
             status=DownloadStatus.FAILED,
             error_message="Something went wrong",
         )
-        # Add an active download (should be skipped)
+        # Add an active download (cancelled, kept in list)
         active = Download(
             tmdb_id=3,
             title="Active Movie",
@@ -465,21 +513,82 @@ class TestDownloadsRouter:
             mock_instance = mock_service_class.return_value
             mock_instance.delete_torrent = AsyncMock(return_value=True)
             mock_instance.close = AsyncMock()
-            response = client.delete("/api/downloads/")
+            response = client.request("DELETE", "/api/downloads/", json={"downloads": [
+                {"id": completed.id, "delete_files": False},
+                {"id": failed.id, "delete_files": False},
+                {"id": active.id, "delete_files": False},
+            ]})
 
         assert response.status_code == 200
         data = response.json()
-        assert data["deleted"] == 2
-        assert data["skipped"] == 1
+        assert data["cleared"] == 2
+        assert data["files_deleted"] is False
 
-        # Verify only active remains
+        # Finished downloads are soft-deleted (CLEARED); the active one is cancelled
         remaining = db_session.query(Download).all()
-        assert len(remaining) == 1
-        assert remaining[0].status == DownloadStatus.DOWNLOADING
+        assert len(remaining) == 3
+        assert {d.status for d in remaining} == {
+            DownloadStatus.CLEARED,
+            DownloadStatus.CANCELLED,
+        }
+        assert len([d for d in remaining if d.status == DownloadStatus.CLEARED]) == 2
 
-        # Verify qBittorrent delete_torrent was called for completed (not failed, no hash)
-        mock_instance.delete_torrent.assert_awaited_once_with("abc123abc123abc123abc123abc123abc123abc1", delete_files=False)
+        # The list endpoint hides cleared downloads
+        listed = client.get("/api/downloads/").json()
+        assert len(listed) == 1
+        assert listed[0]["status"] == DownloadStatus.CANCELLED.value
+
+        # qBittorrent delete_torrent called for downloads with a hash
+        assert mock_instance.delete_torrent.await_count == 2
+        mock_instance.delete_torrent.assert_any_await(
+            "abc123abc123abc123abc123abc123abc123abc1", delete_files=False
+        )
+        mock_instance.delete_torrent.assert_any_await(
+            "def456def456def456def456def456def456def4", delete_files=False
+        )
         mock_instance.close.assert_awaited_once()
+
+    def test_clear_selected_downloads_deletes_files(self, client, db_session, tmp_path):
+        """Clearing with delete_files removes the download folder from disk."""
+        folder = tmp_path / "movie"
+        folder.mkdir()
+        completed = Download(
+            tmdb_id=1,
+            title="Completed Movie",
+            type=ContentType.MOVIE,
+            torrent_name="Test Movie 1080p",
+            status=DownloadStatus.COMPLETED,
+            source_folder=str(folder),
+        )
+        db_session.add(completed)
+        db_session.commit()
+
+        with patch('app.routers.downloads.QBittorrentService') as mock_service_class:
+            mock_instance = mock_service_class.return_value
+            mock_instance.delete_torrent = AsyncMock(return_value=True)
+            mock_instance.close = AsyncMock()
+            response = client.request("DELETE", "/api/downloads/", json={"downloads": [
+                {"id": completed.id, "delete_files": True},
+            ]})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["cleared"] == 1
+        assert data["files_deleted"] is True
+        assert not folder.exists()
+
+    def test_clear_selected_downloads_unknown_id_ignored(self, client, db_session):
+        """Unknown ids in the payload are ignored without error."""
+        with patch('app.routers.downloads.QBittorrentService') as mock_service_class:
+            mock_instance = mock_service_class.return_value
+            mock_instance.delete_torrent = AsyncMock(return_value=True)
+            mock_instance.close = AsyncMock()
+            response = client.request("DELETE", "/api/downloads/", json={"downloads": [
+                {"id": 999, "delete_files": False},
+            ]})
+
+        assert response.status_code == 200
+        assert response.json()["cleared"] == 0
 
 
 class TestSettingsRouter:
