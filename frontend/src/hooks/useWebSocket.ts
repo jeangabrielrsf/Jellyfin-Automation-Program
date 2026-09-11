@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 
 const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000, 30000];
 const PING_INTERVAL = 30000;
@@ -15,7 +15,6 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let pingTimer: ReturnType<typeof setInterval> | null = null;
 let reconnectAttempt = 0;
 const listeners = new Set<Listener>();
-let globalReadyState: number = WebSocket.CLOSED;
 let globalLastMessage: WSMessage | null = null;
 
 function notifyListeners() {
@@ -53,13 +52,8 @@ function connect() {
     return;
   }
 
-  globalReadyState = WebSocket.CONNECTING;
-  notifyListeners();
-
   ws.onopen = () => {
     reconnectAttempt = 0;
-    globalReadyState = WebSocket.OPEN;
-    notifyListeners();
 
     pingTimer = setInterval(() => {
       if (ws?.readyState === WebSocket.OPEN) {
@@ -78,12 +72,10 @@ function connect() {
   };
 
   ws.onclose = () => {
-    globalReadyState = WebSocket.CLOSED;
     if (pingTimer) {
       clearInterval(pingTimer);
       pingTimer = null;
     }
-    notifyListeners();
     scheduleReconnect();
   };
 
@@ -109,22 +101,18 @@ function teardownConnection() {
     ws.close();
     ws = null;
   }
-  globalReadyState = WebSocket.CLOSED;
   globalLastMessage = null;
 }
 
 export function useWebSocket() {
   const [lastMessage, setLastMessage] = useState<WSMessage | null>(globalLastMessage);
-  const [readyState, setReadyState] = useState<number>(globalReadyState);
 
   useEffect(() => {
     const listener: Listener = (message) => {
       setLastMessage(message);
-      setReadyState(globalReadyState);
     };
 
     listeners.add(listener);
-    setReadyState(globalReadyState);
 
     if (listeners.size === 1) {
       connect();
@@ -138,11 +126,5 @@ export function useWebSocket() {
     };
   }, []);
 
-  const sendMessage = useCallback((data: Record<string, unknown>) => {
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(data));
-    }
-  }, []);
-
-  return { lastMessage, readyState, sendMessage };
+  return { lastMessage };
 }

@@ -34,12 +34,10 @@ describe('useTorrentFilters', () => {
       const { result } = renderHook(() => useTorrentFilters([]));
 
       expect(result.current.preferredQuality).toBe('1080p');
-      expect(result.current.preferredLanguage).toBe('legendado');
       expect(result.current.customSearchEnabled).toBe(false);
       expect(result.current.customQuery).toBe('');
       expect(result.current.selectedTitle).toBe('');
       expect(result.current.selectedQualities).toEqual(['1080p']);
-      expect(result.current.selectedLanguages).toEqual(['Legendado']);
       expect(result.current.minSeeds).toBe(0);
       expect(result.current.freeleechOnly).toBe(false);
       expect(result.current.sortBy).toBe('score');
@@ -66,28 +64,6 @@ describe('useTorrentFilters', () => {
       });
 
       expect(result.current.selectedQualities).toEqual(['720p']);
-    });
-  });
-
-  describe('sync effects: preferredLanguage → selectedLanguages', () => {
-    it('syncs preferredLanguage to selectedLanguages with capitalization', () => {
-      const { result } = renderHook(() => useTorrentFilters([]));
-
-      act(() => {
-        result.current.setPreferredLanguage('dublado');
-      });
-
-      expect(result.current.selectedLanguages).toEqual(['Dublado']);
-    });
-
-    it('handles "dual áudio" capitalization', () => {
-      const { result } = renderHook(() => useTorrentFilters([]));
-
-      act(() => {
-        result.current.setPreferredLanguage('dual áudio');
-      });
-
-      expect(result.current.selectedLanguages).toEqual(['Dual áudio']);
     });
   });
 
@@ -139,7 +115,6 @@ describe('useTorrentFilters', () => {
 
       act(() => {
         result.current.setSelectedQualities(['720p']);
-        result.current.setSelectedLanguages([]);
       });
 
       expect(result.current.filteredTorrents).toHaveLength(1);
@@ -151,22 +126,9 @@ describe('useTorrentFilters', () => {
 
       act(() => {
         result.current.setSelectedQualities(['1080p', '720p']);
-        result.current.setSelectedLanguages([]);
       });
 
       expect(result.current.filteredTorrents).toHaveLength(4);
-    });
-
-    it('filters by language', () => {
-      const { result } = renderHook(() => useTorrentFilters(sampleTorrents));
-
-      act(() => {
-        result.current.setSelectedLanguages(['Dublado']);
-        result.current.setSelectedQualities([]);
-      });
-
-      expect(result.current.filteredTorrents).toHaveLength(1);
-      expect(result.current.filteredTorrents[0].language).toBe('Dublado');
     });
 
     it('filters by minSeeds', () => {
@@ -206,7 +168,6 @@ describe('useTorrentFilters', () => {
 
       act(() => {
         result.current.setSelectedQualities([]);
-        result.current.setSelectedLanguages([]);
       });
 
       expect(result.current.filteredTorrents).toHaveLength(5);
@@ -219,7 +180,6 @@ describe('useTorrentFilters', () => {
 
       act(() => {
         result.current.setSelectedQualities([]);
-        result.current.setSelectedLanguages([]);
       });
 
       const scores = result.current.filteredTorrents.map(t => t.score);
@@ -232,7 +192,6 @@ describe('useTorrentFilters', () => {
       act(() => {
         result.current.setSortBy('seeds');
         result.current.setSelectedQualities([]);
-        result.current.setSelectedLanguages([]);
       });
 
       const seeds = result.current.filteredTorrents.map(t => t.seeds);
@@ -245,7 +204,6 @@ describe('useTorrentFilters', () => {
       act(() => {
         result.current.setSortBy('date');
         result.current.setSelectedQualities([]);
-        result.current.setSelectedLanguages([]);
       });
 
       const dates = result.current.filteredTorrents.map(t => t.publish_date);
@@ -259,7 +217,6 @@ describe('useTorrentFilters', () => {
       act(() => {
         result.current.setSortOrder('asc');
         result.current.setSelectedQualities([]);
-        result.current.setSelectedLanguages([]);
       });
 
       const scores = result.current.filteredTorrents.map(t => t.score);
@@ -277,7 +234,6 @@ describe('useTorrentFilters', () => {
 
       act(() => {
         result.current.setSelectedQualities([]);
-        result.current.setSelectedLanguages([]);
       });
 
       expect(result.current.visibleTorrents).toHaveLength(20);
@@ -293,7 +249,6 @@ describe('useTorrentFilters', () => {
 
       act(() => {
         result.current.setSelectedQualities([]);
-        result.current.setSelectedLanguages([]);
       });
 
       act(() => {
@@ -309,7 +264,6 @@ describe('useTorrentFilters', () => {
 
       act(() => {
         result.current.setSelectedQualities([]);
-        result.current.setSelectedLanguages([]);
       });
 
       expect(result.current.hasMoreTorrents).toBe(false);

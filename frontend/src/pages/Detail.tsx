@@ -12,7 +12,6 @@ import { useTorrentFilters } from '@/hooks/useTorrentFilters';
 import { useDownload } from '@/hooks/useDownload';
 
 const QUALITY_OPTIONS = ['2160p', '1080p', '720p', '480p'];
-const LANGUAGE_OPTIONS = ['Legendado', 'Dublado', 'Dual Áudio'];
 
 const DetailPage: React.FC = () => {
   const { mediaType, id } = useParams<{ mediaType: string; id: string }>();
@@ -92,12 +91,10 @@ const DetailPage: React.FC = () => {
 
   const {
     preferredQuality, setPreferredQuality,
-    preferredLanguage, setPreferredLanguage,
     customSearchEnabled, setCustomSearchEnabled,
     customQuery, setCustomQuery,
     selectedTitle, setSelectedTitle,
     selectedQualities, setSelectedQualities,
-    selectedLanguages, setSelectedLanguages,
     minSeeds, setMinSeeds,
     freeleechOnly, setFreeleechOnly,
     sortBy, setSortBy,
@@ -485,31 +482,17 @@ const DetailPage: React.FC = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">Qualidade preferida</label>
-                <select
-                  value={preferredQuality}
-                  onChange={(e) => setPreferredQuality(e.target.value)}
-                  className="w-full px-4 py-2 rounded-xl glass bg-transparent border border-border/50 text-foreground"
-                >
-                  {QUALITY_OPTIONS.map(q => (
-                    <option key={q} value={q}>{q}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">Idioma preferido</label>
-                <select
-                  value={preferredLanguage}
-                  onChange={(e) => setPreferredLanguage(e.target.value)}
-                  className="w-full px-4 py-2 rounded-xl glass bg-transparent border border-border/50 text-foreground"
-                >
-                  {LANGUAGE_OPTIONS.map(l => (
-                    <option key={l} value={l.toLowerCase()}>{l}</option>
-                  ))}
-                </select>
-              </div>
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Qualidade preferida</label>
+              <select
+                value={preferredQuality}
+                onChange={(e) => setPreferredQuality(e.target.value)}
+                className="w-full px-4 py-2 rounded-xl glass bg-transparent border border-border/50 text-foreground"
+              >
+                {QUALITY_OPTIONS.map(q => (
+                  <option key={q} value={q}>{q}</option>
+                ))}
+              </select>
             </div>
 
             {!isTV && (
@@ -584,32 +567,6 @@ const DetailPage: React.FC = () => {
                           }`}
                         >
                           {q}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Idioma</label>
-                  <div className="flex flex-wrap gap-2">
-                    {LANGUAGE_OPTIONS.map(l => {
-                      const isSelected = selectedLanguages.includes(l);
-                      return (
-                        <button
-                          key={l}
-                          onClick={() => {
-                            setSelectedLanguages(prev =>
-                              isSelected ? prev.filter(x => x !== l) : [...prev, l]
-                            );
-                          }}
-                          className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                            isSelected
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-background/50 text-muted-foreground hover:text-foreground border border-border/50'
-                          }`}
-                        >
-                          {l}
                         </button>
                       );
                     })}

@@ -5,13 +5,11 @@ const PAGE_SIZE = 20;
 
 export function useTorrentFilters(torrents: TorrentResult[]) {
   const [preferredQuality, setPreferredQuality] = useState('1080p');
-  const [preferredLanguage, setPreferredLanguage] = useState('legendado');
   const [customSearchEnabled, setCustomSearchEnabled] = useState(false);
   const [customQuery, setCustomQuery] = useState('');
   const [selectedTitle, setSelectedTitle] = useState<string>('');
 
   const [selectedQualities, setSelectedQualities] = useState<string[]>(['1080p']);
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(['Legendado']);
   const [minSeeds, setMinSeeds] = useState(0);
   const [freeleechOnly, setFreeleechOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'score' | 'seeds' | 'date' | 'size'>('score');
@@ -22,12 +20,11 @@ export function useTorrentFilters(torrents: TorrentResult[]) {
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [selectedQualities, selectedLanguages, minSeeds, freeleechOnly, titleFilter, sortBy, sortOrder]);
+  }, [selectedQualities, minSeeds, freeleechOnly, titleFilter, sortBy, sortOrder]);
 
   useEffect(() => {
     setSelectedQualities([preferredQuality]);
-    setSelectedLanguages([preferredLanguage.charAt(0).toUpperCase() + preferredLanguage.slice(1)]);
-  }, [preferredQuality, preferredLanguage]);
+  }, [preferredQuality]);
 
   const filteredAndSortedTorrents = useMemo(() => {
     if (!torrents) return [];
@@ -75,7 +72,7 @@ export function useTorrentFilters(torrents: TorrentResult[]) {
     });
 
     return filtered;
-  }, [torrents, selectedQualities, selectedLanguages, minSeeds, freeleechOnly, titleFilter, sortBy, sortOrder]);
+  }, [torrents, selectedQualities, minSeeds, freeleechOnly, titleFilter, sortBy, sortOrder]);
 
   const visibleTorrents = useMemo(() => {
     return filteredAndSortedTorrents.slice(0, visibleCount);
@@ -86,8 +83,6 @@ export function useTorrentFilters(torrents: TorrentResult[]) {
   return {
     preferredQuality,
     setPreferredQuality,
-    preferredLanguage,
-    setPreferredLanguage,
     customSearchEnabled,
     setCustomSearchEnabled,
     customQuery,
@@ -96,8 +91,6 @@ export function useTorrentFilters(torrents: TorrentResult[]) {
     setSelectedTitle,
     selectedQualities,
     setSelectedQualities,
-    selectedLanguages,
-    setSelectedLanguages,
     minSeeds,
     setMinSeeds,
     freeleechOnly,

@@ -1,8 +1,14 @@
 import { renderHook, act } from '@testing-library/react';
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AxiosResponse } from 'axios';
 import { useDownload } from './useDownload';
 import { TorrentResult } from '@/types';
+
+const queryClient = new QueryClient();
+const wrapper = ({ children }: { children: React.ReactNode }) =>
+  React.createElement(QueryClientProvider, { client: queryClient }, children);
 
 vi.mock('@/services/api', () => ({
   downloadAPI: {
@@ -62,12 +68,12 @@ describe('useDownload', () => {
 
   describe('initial state', () => {
     it('returns an empty downloadingTorrents set', () => {
-      const { result } = renderHook(() => useDownload(defaultParams));
+      const { result } = renderHook(() => useDownload(defaultParams), { wrapper });
       expect(result.current.downloadingTorrents.size).toBe(0);
     });
 
     it('returns handleDownload function', () => {
-      const { result } = renderHook(() => useDownload(defaultParams));
+      const { result } = renderHook(() => useDownload(defaultParams), { wrapper });
       expect(typeof result.current.handleDownload).toBe('function');
     });
   });
@@ -76,7 +82,7 @@ describe('useDownload', () => {
     it('calls downloadAPI.createDownload with correct payload for movie', async () => {
       mockedCreateDownload.mockResolvedValueOnce(mockResponse());
       const torrent = makeTorrent({ magnet_url: 'magnet:?xt=...' });
-      const { result } = renderHook(() => useDownload(defaultParams));
+      const { result } = renderHook(() => useDownload(defaultParams), { wrapper });
 
       await act(async () => {
         await result.current.handleDownload(torrent);
@@ -103,7 +109,7 @@ describe('useDownload', () => {
     it('shows success toast on successful download', async () => {
       mockedCreateDownload.mockResolvedValueOnce(mockResponse());
       const torrent = makeTorrent();
-      const { result } = renderHook(() => useDownload(defaultParams));
+      const { result } = renderHook(() => useDownload(defaultParams), { wrapper });
 
       await act(async () => {
         await result.current.handleDownload(torrent);
@@ -115,7 +121,7 @@ describe('useDownload', () => {
     it('shows info toast when already_exists is true', async () => {
       mockedCreateDownload.mockResolvedValueOnce(mockResponse({ already_exists: true }));
       const torrent = makeTorrent();
-      const { result } = renderHook(() => useDownload(defaultParams));
+      const { result } = renderHook(() => useDownload(defaultParams), { wrapper });
 
       await act(async () => {
         await result.current.handleDownload(torrent);
@@ -130,7 +136,7 @@ describe('useDownload', () => {
     it('shows error toast on API failure', async () => {
       mockedCreateDownload.mockRejectedValueOnce(new Error('Network error'));
       const torrent = makeTorrent();
-      const { result } = renderHook(() => useDownload(defaultParams));
+      const { result } = renderHook(() => useDownload(defaultParams), { wrapper });
 
       await act(async () => {
         await result.current.handleDownload(torrent);
@@ -147,7 +153,7 @@ describe('useDownload', () => {
       mockedCreateDownload.mockReturnValueOnce(pendingPromise);
 
       const torrent = makeTorrent();
-      const { result } = renderHook(() => useDownload(defaultParams));
+      const { result } = renderHook(() => useDownload(defaultParams), { wrapper });
 
       let downloadPromise: Promise<void>;
       act(() => {
@@ -167,7 +173,7 @@ describe('useDownload', () => {
     it('removes torrent key from set after successful download', async () => {
       mockedCreateDownload.mockResolvedValueOnce(mockResponse());
       const torrent = makeTorrent();
-      const { result } = renderHook(() => useDownload(defaultParams));
+      const { result } = renderHook(() => useDownload(defaultParams), { wrapper });
 
       await act(async () => {
         await result.current.handleDownload(torrent);
@@ -179,7 +185,7 @@ describe('useDownload', () => {
     it('removes torrent key from set after failed download', async () => {
       mockedCreateDownload.mockRejectedValueOnce(new Error('fail'));
       const torrent = makeTorrent();
-      const { result } = renderHook(() => useDownload(defaultParams));
+      const { result } = renderHook(() => useDownload(defaultParams), { wrapper });
 
       await act(async () => {
         await result.current.handleDownload(torrent);
@@ -194,7 +200,7 @@ describe('useDownload', () => {
       mockedCreateDownload.mockReturnValueOnce(pendingPromise);
 
       const torrent = makeTorrent();
-      const { result } = renderHook(() => useDownload(defaultParams));
+      const { result } = renderHook(() => useDownload(defaultParams), { wrapper });
 
       let firstDownload: Promise<void>;
       act(() => {
@@ -223,7 +229,7 @@ describe('useDownload', () => {
         effectiveMediaType: 'series',
         selectedSeason: 2,
         selectedEpisode: 5,
-      }));
+      }), { wrapper });
 
       await act(async () => {
         await result.current.handleDownload(torrent);
@@ -246,7 +252,7 @@ describe('useDownload', () => {
         effectiveMediaType: 'series',
         selectedSeason: 1,
         selectedEpisode: 'temporada-inteira',
-      }));
+      }), { wrapper });
 
       await act(async () => {
         await result.current.handleDownload(torrent);
@@ -266,7 +272,7 @@ describe('useDownload', () => {
       const { result } = renderHook(() => useDownload({
         ...defaultParams,
         detail: undefined,
-      }));
+      }), { wrapper });
 
       await act(async () => {
         await result.current.handleDownload(torrent);
@@ -280,7 +286,7 @@ describe('useDownload', () => {
     it('passes undefined for magnet_link when torrent has no magnet_url', async () => {
       mockedCreateDownload.mockResolvedValueOnce(mockResponse());
       const torrent = makeTorrent({ magnet_url: undefined });
-      const { result } = renderHook(() => useDownload(defaultParams));
+      const { result } = renderHook(() => useDownload(defaultParams), { wrapper });
 
       await act(async () => {
         await result.current.handleDownload(torrent);
@@ -294,7 +300,7 @@ describe('useDownload', () => {
     it('defaults quality to 1080p when torrent has no quality', async () => {
       mockedCreateDownload.mockResolvedValueOnce(mockResponse());
       const torrent = makeTorrent({ quality: undefined });
-      const { result } = renderHook(() => useDownload(defaultParams));
+      const { result } = renderHook(() => useDownload(defaultParams), { wrapper });
 
       await act(async () => {
         await result.current.handleDownload(torrent);
@@ -308,7 +314,7 @@ describe('useDownload', () => {
     it('defaults language_preference to legendado when torrent has no language', async () => {
       mockedCreateDownload.mockResolvedValueOnce(mockResponse());
       const torrent = makeTorrent({ language: undefined });
-      const { result } = renderHook(() => useDownload(defaultParams));
+      const { result } = renderHook(() => useDownload(defaultParams), { wrapper });
 
       await act(async () => {
         await result.current.handleDownload(torrent);

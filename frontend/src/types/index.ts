@@ -98,18 +98,6 @@ export interface Download {
   created_at: string;
 }
 
-export interface AppSettings {
-  movies_path: string;
-  series_path: string;
-  animes_path: string;
-  default_quality: string;
-  default_language: string;
-  qbittorrent_host: string;
-  jackett_url: string;
-  jellyfin_url: string;
-  log_level: string;
-}
-
 export interface SectionInfo {
   id: string
   title: string

@@ -106,9 +106,6 @@ export const downloadAPI = {
   pauseDownload: (id: number) =>
     api.post<MessageResponse>(`/downloads/${id}/pause`),
 
-  resumeDownload: (id: number) =>
-    api.post<MessageResponse>(`/downloads/${id}/resume`),
-
   clearDownloads: (downloads: { id: number; delete_files: boolean }[]) =>
     api.delete<ClearDownloadsResponse>('/downloads/', { data: { downloads } }),
 
