@@ -1,5 +1,5 @@
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { filesystemAPI, DiskSpaceResponse } from '../services/api';
 
 const formatBytes = (bytes: number): string => {
@@ -8,6 +8,9 @@ const formatBytes = (bytes: number): string => {
   if (gb >= 1000) return `${(gb / 1024).toFixed(2)} TB`;
   return `${gb.toFixed(1)} GB`;
 };
+
+const RADIUS = 70;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 const DiskSpaceChart: React.FC = () => {
   const { data, isLoading, isError } = useQuery({
@@ -33,44 +36,44 @@ const DiskSpaceChart: React.FC = () => {
     );
   }
 
-  const chartData = [
-    { name: 'Usado', value: data.used_bytes },
-    { name: 'Livre', value: data.free_bytes },
-  ];
-
-  const COLORS = ['#ef4444', '#22c55e'];
+  const usedRatio = data.total_bytes > 0 ? data.used_bytes / data.total_bytes : 0;
 
   return (
     <div className="glass rounded-2xl p-6">
       <h3 className="font-display text-lg font-bold text-foreground mb-4">
         Espaço em Disco
       </h3>
-      <div className="flex items-center justify-center">
-        <ResponsiveContainer width="100%" height={200}>
-          <PieChart>
-            <Pie
-              data={chartData}
-              cx="50%"
-              cy="50%"
-              innerRadius={60}
-              outerRadius={80}
-              paddingAngle={5}
-              dataKey="value"
-            >
-              {chartData.map((_entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip
-              formatter={(value: unknown) => typeof value === 'number' ? formatBytes(value) : String(value)}
-              contentStyle={{
-                backgroundColor: 'hsl(var(--card))',
-                border: '1px solid hsl(var(--border))',
-                borderRadius: '8px',
-              }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
+      <div className="relative flex items-center justify-center">
+        <svg viewBox="0 0 200 200" className="w-[200px] h-[200px]" role="img" aria-label="Uso do disco">
+          <circle
+            cx="100"
+            cy="100"
+            r={RADIUS}
+            fill="none"
+            stroke="hsl(var(--muted))"
+            strokeWidth="20"
+          />
+          <circle
+            cx="100"
+            cy="100"
+            r={RADIUS}
+            fill="none"
+            stroke="#ef4444"
+            strokeWidth="20"
+            strokeDasharray={`${usedRatio * CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+            transform="rotate(-90 100 100)"
+          />
+          <circle
+            cx="100"
+            cy="100"
+            r={RADIUS}
+            fill="none"
+            stroke="#22c55e"
+            strokeWidth="20"
+            strokeDasharray={`${(1 - usedRatio) * CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+            transform={`rotate(${usedRatio * 360 - 90} 100 100)`}
+          />
+        </svg>
         <div className="absolute flex flex-col items-center justify-center">
           <p className="text-2xl font-bold text-foreground">
             {formatBytes(data.free_bytes)}
